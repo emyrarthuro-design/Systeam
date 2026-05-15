@@ -13,6 +13,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    env:
+      TEST_STUDENT_EMAIL: ${{ secrets.TEST_STUDENT_EMAIL }}
+      TEST_STUDENT_PASSWORD: ${{ secrets.TEST_STUDENT_PASSWORD }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
