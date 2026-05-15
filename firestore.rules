@@ -1,0 +1,91 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // -- HELPERS --
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserData(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data;
+    }
+    
+    function getUserRole() {
+      return getUserData(request.auth.uid).role;
+    }
+    
+    function isSuperAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'emyr.arthuro@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData(request.auth.uid).role == 'super_admin')
+      );
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'emyr.arthuro@gmail.com' ||
+        request.auth.token.email == 'info@emyrarthuro.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          (getUserData(request.auth.uid).role == 'admin' || getUserData(request.auth.uid).role == 'super_admin')
+        )
+      );
+    }
+    
+    // Safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    
+    // USERS
+    match /users/{userId} {
+      allow get: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      
+      allow update: if isAuthenticated() && (
+        (request.auth.uid == userId && request.resource.data.role == resource.data.role) ||
+        isSuperAdmin() ||
+        (request.auth.uid == userId && request.auth.token.email == 'emyr.arthuro@gmail.com' && request.resource.data.role == 'super_admin') ||
+        (isAdmin() && resource.data.role == 'student' && request.resource.data.role == 'student')
+      );
+      
+      allow delete: if isAdmin() && (
+        (isSuperAdmin() && resource.data.email != 'emyr.arthuro@gmail.com' && request.auth.uid != userId) ||
+        (isAdmin() && resource.data.role == 'student' && request.auth.uid != userId)
+      );
+    }
+    
+    // DIAGNOSTICS
+    match /diagnostics/{docId} {
+      allow get: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+      allow list: if isAdmin();
+      
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        (resource.data.userId == request.auth.uid && resource.data.status == 'in_progress') ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+    
+    // INVITATIONS
+    match /invitations/{invitationId} {
+      allow read: if true; 
+      allow create: if isAdmin();
+      allow update: if isAdmin() || (resource.data.status == 'pending'); 
+      allow delete: if isAdmin();
+    }
+    
+    // ACTIVITY LOGS
+    match /activity_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if false;
+    }
+  }
+}

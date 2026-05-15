@@ -1,0 +1,113 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  
+  /* Brand Palette */
+  --color-sys-bg: #0A0A0A;
+  --color-sys-card: #141414;
+  --color-sys-input: #1C1C1C;
+  --color-sys-border: #2A2A2A;
+  
+  --color-sys-text-main: #FFFFFF;
+  --color-sys-text-sec: #B8B8B8;
+  --color-sys-text-mut: #6B6B6B;
+  
+  --color-sys-accent: #C9A961;
+  --color-sys-accent-hover: #D9BC75;
+  --color-sys-accent-active: #B89651;
+  --color-sys-accent-light: rgba(201, 169, 97, 0.1);
+  --color-sys-accent-alpha: rgba(201, 169, 97, 0.15);
+  
+  --color-sys-success: #C9A961;
+  --color-sys-error: #E85D5D;
+  --color-sys-warning: #E8A85D;
+  --color-sys-info: #5D9BE8;
+
+  /* Tailwind Palette Overrides to Apply Brand globally */
+  --color-slate-950: var(--color-sys-bg);
+  --color-slate-900: var(--color-sys-card);
+  --color-slate-800: var(--color-sys-input);
+  --color-slate-700: var(--color-sys-border);
+  --color-slate-600: var(--color-sys-text-mut);
+  --color-slate-500: var(--color-sys-text-sec);
+  --color-slate-400: var(--color-sys-text-sec);
+  --color-slate-300: var(--color-sys-text-main);
+  --color-slate-200: var(--color-sys-text-main);
+
+  --color-amber-500: var(--color-sys-accent);
+  --color-amber-400: var(--color-sys-accent-hover);
+  --color-emerald-500: var(--color-sys-success);
+  --color-emerald-400: var(--color-sys-success);
+  --color-emerald-700: var(--color-sys-success);
+  --color-rose-500: var(--color-sys-error);
+  --color-rose-400: var(--color-sys-error);
+  --color-rose-600: var(--color-sys-error);
+  --color-sky-500: var(--color-sys-info);
+  --color-sky-400: var(--color-sys-info);
+  
+  /* PDF / Print Palettes */
+  --color-print-bg: #FAF8F3;
+  --color-print-text: #0A0A0A;
+  --animate-logo-pulse: logo-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  
+  @keyframes logo-pulse {
+    0%, 100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.05);
+    }
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-sys-bg text-sys-text-main font-sans;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-sans text-sys-text-main;
+  }
+}
+
+@layer components {
+  .logo-text {
+    @apply font-sans font-bold tracking-tight lowercase;
+  }
+
+  .card-geometric {
+    @apply bg-sys-card border border-sys-border rounded-[12px] p-6 shadow-[0_2px_8px_rgba(0,0,0,0.3)] transition-colors duration-200;
+  }
+  
+  .card-geometric:hover {
+    @apply border-sys-accent;
+  }
+  
+  .btn-geometric-primary {
+    @apply bg-sys-accent text-[#0A0A0A] font-semibold text-sm px-7 py-[14px] rounded-[8px] shadow-[0_4px_12px_rgba(201,169,97,0.15)] transition-all duration-200 hover:bg-sys-accent-hover hover:scale-[1.02] active:bg-sys-accent-active disabled:opacity-50 border border-transparent;
+  }
+  
+  .btn-geometric-secondary {
+    @apply border border-sys-border bg-transparent text-sys-text-main font-semibold text-sm px-7 py-[14px] rounded-[8px] transition-all duration-200 hover:bg-sys-input hover:border-sys-accent active:bg-sys-input disabled:opacity-50;
+  }
+
+  .input-geometric {
+    @apply w-full bg-sys-input border border-sys-border rounded-[8px] px-4 py-[14px] text-sys-text-main focus:outline-none focus:border-sys-accent focus:ring-[3px] focus:ring-sys-accent-light transition-all placeholder:text-sys-text-mut;
+  }
+  
+  .label-geometric {
+    @apply block text-[13px] font-medium text-sys-text-sec mb-2 uppercase tracking-[0.05em];
+  }
+
+  .badge-chip {
+    @apply bg-sys-input border border-sys-border text-sys-text-sec rounded-full px-4 py-2 text-sm font-medium transition-all duration-200;
+  }
+  
+  .badge-chip.selected {
+    @apply bg-sys-accent-alpha border-sys-accent text-sys-accent;
+  }
+}
+

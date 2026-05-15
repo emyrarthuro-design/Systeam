@@ -1,0 +1,6 @@
+{
+  "name": "Diagnóstico inicial del Experto - SysTeam",
+  "description": "Herramienta de diagnóstico profesional para expertos y emprendedores de la Incubadora SysTeam.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": []
+}

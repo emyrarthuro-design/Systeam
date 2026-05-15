@@ -1,0 +1,53 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user basic information and role.",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "country": { "type": "string" },
+        "role": { "type": "string", "enum": ["student", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fullName", "email", "role"]
+    },
+    "Diagnosis": {
+      "title": "Initial Diagnosis",
+      "description": "Stores the diagnosis answers and AI generated analysis.",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "in_progress", "completed"] },
+        "currentBlock": { "type": "number" },
+        "answers": {
+          "type": "object",
+          "description": "Map of block keys to answer objects."
+        },
+        "progress": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "analysis": {
+          "type": "object",
+          "description": "The AI generated analysis result."
+        },
+        "internalNote": {
+          "type": "object",
+          "description": "Internal feedback for SysTeam admin."
+        }
+      },
+      "required": ["studentId", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile data."
+    },
+    "/diagnoses/{userId}": {
+      "schema": "Diagnosis",
+      "description": "The diagnosis for a specific user. Using userId as docId ensures one per user."
+    }
+  }
+}
