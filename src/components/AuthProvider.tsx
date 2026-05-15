@@ -3,6 +3,7 @@ import { UserProfile } from '../types';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { isSuperAdmin as checkSuperAdmin, isAnyAdmin as checkAnyAdmin } from '../lib/admins';
 
 interface AuthContextType {
   user: { uid: string, email: string } | null;
@@ -70,8 +71,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await signOut(auth);
   };
 
-  const isSuperAdmin = profile?.role === 'super_admin' || user?.email === 'emyr.arthuro@gmail.com';
-  const isAdmin = isSuperAdmin || profile?.role === 'admin' || user?.email === 'info@emyrarthuro.com';
+  const isSuperAdmin = profile?.role === 'super_admin' || checkSuperAdmin(user?.email);
+  const isAdmin = isSuperAdmin || profile?.role === 'admin' || checkAnyAdmin(user?.email);
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, isAdmin, isSuperAdmin, logout }}>

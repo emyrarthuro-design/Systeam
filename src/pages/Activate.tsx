@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { collection, query, where, getDocs, doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
+import { createOrUpdateStudentProfile } from '../lib/db';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Lock, ShieldCheck, CheckCircle2, AlertTriangle, Eye, EyeOff, Clock, User, ChevronRight, ArrowLeft } from 'lucide-react';
 import { Invitation } from '../types';
@@ -11,7 +12,7 @@ import { parseDate } from '../lib/dateUtils';
 export default function Activate() {
   const navigate = useNavigate();
   
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [email, setEmail] = useState('');
   const [validating, setValidating] = useState(false);
   
@@ -25,6 +26,8 @@ export default function Activate() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [creating, setCreating] = useState(false);
   const [globalError, setGlobalError] = useState('');
+  const [loggingIn, setLoggingIn] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   const handleValidateEmail = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,23 +101,19 @@ export default function Activate() {
       const newUser = userCredential.user;
 
       // 2. Create user document
-      await setDoc(doc(db, 'users', newUser.uid), {
-        uid: newUser.uid,
-        email: invitation.email,
-        fullName: invitation.fullName,
-        country: invitation.country,
-        invitationCode: invitation.code,
-        role: 'student',
-        createdAt: serverTimestamp(),
-        lastLogin: serverTimestamp(),
-        diagnosticStatus: 'not_started'
-      });
+      await createOrUpdateStudentProfile(newUser, invitation);
 
       // 3. Update invitation
-      await updateDoc(doc(db, 'invitations', invitation.code || invitation.id || ''), {
-        status: 'activated',
-        activatedAt: serverTimestamp()
-      });
+      try {
+        await updateDoc(doc(db, 'invitations', invitation.id), {
+          status: 'activated',
+          activatedAt: serverTimestamp()
+        });
+        console.log('[ACTIVATE] Invitation marked as used:', invitation.id);
+      } catch (err) {
+        console.error('[ACTIVATE] Failed to mark invitation as used:', 
+          { invitationId: invitation.id, error: err });
+      }
 
       // 4. Success state
       setStep(4);
@@ -126,7 +125,15 @@ export default function Activate() {
     } catch (err: any) {
       console.error(err);
       if (err.code === 'auth/email-already-in-use') {
-        setGlobalError('Este email ya tiene una cuenta. Intenta iniciar sesión.');
+        const usersQ = query(collection(db, 'users'), where('email', '==', invitation.email));
+        const usersSnap = await getDocs(usersQ);
+        if (!usersSnap.empty) {
+          setErrorType('already_active');
+          setStep(2);
+        } else {
+          console.log('[ACTIVATE-RECOVER] Detected orphaned auth account for email:', invitation.email);
+          setStep(5);
+        }
       } else if (err.code === 'auth/weak-password') {
         setGlobalError('La contraseña no cumple los requisitos.');
       } else if (err.code === 'auth/network-request-failed') {
@@ -135,6 +142,64 @@ export default function Activate() {
         setGlobalError('Error inesperado. Intenta de nuevo o contacta a SysTeam.');
       }
       setCreating(false);
+    }
+  };
+
+  const handleRecoverAndActivate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!invitation || !password) return;
+
+    setLoggingIn(true);
+    setGlobalError('');
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, invitation.email, password);
+      const user = userCredential.user;
+
+      if (user.email !== invitation.email) {
+        setGlobalError('El email del usuario no coincide con la invitación.');
+        setLoggingIn(false);
+        return;
+      }
+
+      console.log('[ACTIVATE-RECOVER] User signed in successfully, recreating profile');
+
+      await createOrUpdateStudentProfile(user, invitation);
+      console.log('[ACTIVATE-RECOVER] Profile created/merged:', user.uid);
+
+      try {
+        await updateDoc(doc(db, 'invitations', invitation.id), {
+          status: 'activated',
+          activatedAt: serverTimestamp()
+        });
+        console.log('[ACTIVATE] Invitation marked as used:', invitation.id);
+      } catch (err) {
+        console.error('[ACTIVATE] Failed to mark invitation as used:', { invitationId: invitation.id, error: err });
+      }
+
+      setStep(4);
+      setTimeout(() => {
+        navigate('/diagnostico');
+      }, 2000);
+
+    } catch (err: any) {
+      console.error('[ACTIVATE-RECOVER] Failed to sign in:', err);
+      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setGlobalError('Contraseña incorrecta. Intenta nuevamente.');
+      } else {
+        setGlobalError('Error al iniciar sesión. Contacta a soporte.');
+      }
+      setLoggingIn(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!invitation) return;
+    try {
+      await sendPasswordResetEmail(auth, invitation.email);
+      setResetSent(true);
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -449,6 +514,87 @@ export default function Activate() {
               <p className="text-slate-400 font-medium font-sans">Iniciando tu diagnóstico...</p>
             </motion.div>
           )}
+          {step === 5 && invitation && (
+            <motion.div 
+              key="step5"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="bg-[#111111] p-10 rounded-sm border border-slate-900 shadow-2xl"
+            >
+              <div className="text-center mb-8">
+                <div className="w-16 h-16 bg-blue-500/10 border border-blue-500/30 rounded-full flex items-center justify-center text-blue-500 mx-auto mb-6">
+                  <User size={32} />
+                </div>
+                <h2 className="text-2xl font-black text-white uppercase tracking-tight mb-2">Ya tenés una cuenta</h2>
+                <p className="text-slate-400 text-sm font-medium">Iniciá sesión para completar tu activación.</p>
+              </div>
+
+              {globalError && (
+                <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-500 text-xs mb-8 flex items-center gap-3 rounded-sm font-bold">
+                  <AlertTriangle size={18} className="shrink-0" />
+                  {globalError}
+                </div>
+              )}
+
+              <form onSubmit={handleRecoverAndActivate} className="space-y-6">
+                 <div>
+                  <label className="text-[10px] uppercase font-black tracking-[0.2em] text-slate-500 mb-3 block">Email ({invitation.email})</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={20} />
+                    <input 
+                      type={showPassword ? "text" : "password"} 
+                      className="w-full bg-slate-950 border border-slate-800 rounded-sm py-4 pl-12 pr-12 text-white placeholder-slate-700 outline-none focus:border-amber-500 transition-colors"
+                      placeholder="Tu contraseña existente"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      required
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600 hover:text-white"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                   <button 
+                    type="button" 
+                    onClick={handleResetPassword}
+                    className="text-[10px] font-bold text-slate-500 hover:text-white uppercase tracking-widest transition-colors"
+                   >
+                    {resetSent ? 'Correo de recuperación enviado ✓' : '¿Olvidaste tu contraseña?'}
+                   </button>
+                </div>
+
+                <button 
+                  type="submit"
+                  disabled={!password || loggingIn}
+                  className="w-full py-5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black uppercase tracking-[0.2em] rounded-sm transition-all shadow-[0_0_30px_rgba(245,158,11,0.2)] disabled:opacity-20 flex items-center justify-center gap-2"
+                >
+                  {loggingIn ? 'Iniciando sesión...' : 'Iniciar sesión y activar'}
+                </button>
+                
+                <div className="text-center pt-2">
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setStep(1); 
+                      setPassword(''); 
+                      setGlobalError('');
+                    }} 
+                    className="flex items-center justify-center gap-2 mx-auto text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white transition-colors"
+                  >
+                    <ArrowLeft size={12} /> Usar otra cuenta
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          )}
+
         </AnimatePresence>
       </div>
     </div>

@@ -2,6 +2,26 @@ import { db, handleFirestoreError, OperationType } from './firebase';
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ActivityLog, Diagnosis, Invitation, UserProfile } from '../types';
 
+export async function createOrUpdateStudentProfile(userAuth: { uid: string, email: string }, invitation: Partial<Invitation>) {
+  const profileData = {
+    uid: userAuth.uid,
+    email: userAuth.email,
+    fullName: invitation.fullName,
+    country: invitation.country,
+    invitationCode: invitation.code,
+    role: 'student',
+    createdAt: serverTimestamp(),
+    lastLogin: serverTimestamp(),
+    diagnosticStatus: 'not_started'
+  };
+
+  try {
+    await setDoc(doc(db, 'users', userAuth.uid), profileData, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `users/${userAuth.uid}`);
+  }
+}
+
 export async function fetchDiagnosis(userId: string) {
   const path = `diagnostics/${userId}`;
   try {
@@ -49,8 +69,10 @@ export async function logActivity(log: Omit<ActivityLog, 'id' | 'timestamp'>) {
   }
 }
 
+import { isSuperAdmin, isAnyAdmin } from './admins';
+
 export async function ensureSuperAdmin(userId: string, email: string) {
-  if (email !== 'emyr.arthuro@gmail.com') return;
+  if (!isSuperAdmin(email)) return;
   const path = `users/${userId}`;
   try {
     const docRef = doc(db, 'users', userId);
@@ -74,7 +96,7 @@ export async function ensureSuperAdmin(userId: string, email: string) {
 }
 
 export async function ensureAdmin(userId: string, email: string) {
-  if (email !== 'info@emyrarthuro.com') return;
+  if (!isAnyAdmin(email) || isSuperAdmin(email)) return;
   const path = `users/${userId}`;
   try {
     const docRef = doc(db, 'users', userId);

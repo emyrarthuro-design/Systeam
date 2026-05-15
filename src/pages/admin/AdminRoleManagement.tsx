@@ -7,6 +7,7 @@ import { formatDate } from '../../lib/dateUtils';
 import { toast } from 'react-hot-toast';
 import { logActivity } from '../../lib/db';
 import { UserProfile, UserRole } from '../../types';
+import { isSuperAdmin as checkSuperAdmin, SUPER_ADMIN_EMAILS } from '../../lib/admins';
 
 export default function AdminRoleManagement() {
   const { profile: currentAdmin, isSuperAdmin } = useAuth();
@@ -48,7 +49,7 @@ export default function AdminRoleManagement() {
   }, [activeTab, isSuperAdmin]);
 
   const handleRoleChange = async (userId: string, targetEmail: string, newRole: UserRole) => {
-    if (targetEmail === 'emyr.arthuro@gmail.com') {
+    if (checkSuperAdmin(targetEmail)) {
       toast.error('No se puede cambiar el rol del Super Admin principal.');
       return;
     }
@@ -74,7 +75,7 @@ export default function AdminRoleManagement() {
   };
 
   const handleDeleteAdmin = async (userId: string, targetEmail: string) => {
-    if (targetEmail === 'emyr.arthuro@gmail.com') {
+    if (checkSuperAdmin(targetEmail)) {
       toast.error('No se puede eliminar la cuenta del Super Admin principal.');
       return;
     }
@@ -245,7 +246,7 @@ export default function AdminRoleManagement() {
                         <div>
                           <div className="font-bold flex items-center gap-2">
                             {admin.fullName}
-                            {admin.email === 'emyr.arthuro@gmail.com' && <Shield size={12} className="text-amber-500" />}
+                            {checkSuperAdmin(admin.email) && <Shield size={12} className="text-amber-500" />}
                           </div>
                           <div className="text-xs text-sys-text-mut">{admin.email}</div>
                         </div>
@@ -262,7 +263,7 @@ export default function AdminRoleManagement() {
                       {formatDate(admin.createdAt)}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      {admin.email !== 'emyr.arthuro@gmail.com' && admin.uid !== currentAdmin?.uid ? (
+                      {!checkSuperAdmin(admin.email) && admin.uid !== currentAdmin?.uid ? (
                         <div className="flex items-center justify-end gap-2">
                           <button 
                             onClick={() => handleRoleChange(admin.uid, admin.email, admin.role === 'admin' ? 'student' : 'admin')}
@@ -345,7 +346,7 @@ export default function AdminRoleManagement() {
               <h2 className="text-xl font-bold uppercase tracking-tight">Super Administrador Maestro</h2>
               <div className="p-4 bg-sys-input border-l-4 border-amber-500 rounded-sm">
                 <div className="text-xs text-sys-text-mut uppercase font-black mb-1">Email Principal</div>
-                <div className="font-bold text-white text-lg">emyr.arthuro@gmail.com</div>
+                <div className="font-bold text-white text-lg">{SUPER_ADMIN_EMAILS[0]}</div>
               </div>
               <p className="text-sm text-sys-text-sec leading-relaxed">
                 El rol de Super Administrador principal está protegido a nivel de código y base de datos. Tiene permisos totales para gestionar otros administradores, roles y flujos críticos del sistema.

@@ -4,6 +4,7 @@ import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/aut
 import { auth, db } from '../lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Lock, AlertTriangle, Key } from 'lucide-react';
+import { SUPER_ADMIN_EMAILS } from '../lib/admins';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -29,19 +30,19 @@ export default function Login() {
       let isCreatingAdmin = false;
       try {
         const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
-        if (cleanEmail.toLowerCase() === 'emyr.arthuro@gmail.com') {
+        if (SUPER_ADMIN_EMAILS.includes(cleanEmail.toLowerCase())) {
           const { doc, setDoc } = await import('firebase/firestore');
-          // Forzar a admin
+          // Forzar a super_admin
           await setDoc(doc(db, 'users', cred.user.uid), {
             uid: cred.user.uid,
             email: cleanEmail,
             fullName: 'Emyr Arthuro',
-            role: 'admin',
+            role: 'super_admin',
             updatedAt: new Date().toISOString(),
           }, { merge: true });
         }
       } catch (signInErr: any) {
-        if (cleanEmail.toLowerCase() === 'emyr.arthuro@gmail.com' && (signInErr.code === 'auth/invalid-credential' || signInErr.code === 'auth/user-not-found')) {
+        if (SUPER_ADMIN_EMAILS.includes(cleanEmail.toLowerCase()) && (signInErr.code === 'auth/invalid-credential' || signInErr.code === 'auth/user-not-found')) {
           console.log('Creating admin account automatically...');
           isCreatingAdmin = true;
           const { createUserWithEmailAndPassword } = await import('firebase/auth');
@@ -51,7 +52,7 @@ export default function Login() {
             uid: uc.user.uid,
             email: cleanEmail,
             fullName: 'Emyr Arthuro',
-            role: 'admin',
+            role: 'super_admin',
             createdAt: new Date().toISOString(),
           });
         } else {
@@ -60,7 +61,7 @@ export default function Login() {
       }
 
       // Wait a moment for auth state to propagate to App.tsx
-      if (cleanEmail.toLowerCase() === 'emyr.arthuro@gmail.com' || isCreatingAdmin) {
+      if (SUPER_ADMIN_EMAILS.includes(cleanEmail.toLowerCase()) || isCreatingAdmin) {
          setTimeout(() => navigate('/admin'), 500);
       } else {
          setTimeout(() => navigate('/diagnostico'), 500);
