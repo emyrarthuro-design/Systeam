@@ -7,7 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import { formatDateTime } from '../../lib/dateUtils';
 import { useAuth } from '../../components/AuthProvider';
 import { useNavigate } from 'react-router-dom';
-import { logActivity, deleteStudent } from '../../lib/db';
+import { logActivity, deleteUserCompletely } from '../../lib/db';
 import { toast } from 'react-hot-toast';
 
 export default function AdminStudentDetail() {
@@ -23,7 +23,12 @@ export default function AdminStudentDetail() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [confirmEmail, setConfirmEmail] = useState('');
+  const [confirmText, setConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  const isSystemAdmin = student?.role === 'admin' || student?.role === 'super_admin';
+  const canDelete = isSuperAdmin || (!isSystemAdmin);
 
   useEffect(() => {
     async function loadData() {
@@ -73,26 +78,33 @@ export default function AdminStudentDetail() {
   };
 
   const handleDelete = async () => {
-    if (confirmEmail !== student.email) {
-      toast.error('El email no coincide');
+    const expectedConfirmText = (student.fullName || student.name || '').trim().toLowerCase();
+    
+    if (confirmText.trim().toLowerCase() !== expectedConfirmText) {
       return;
     }
 
+    setDeleting(true);
+    setDeleteError('');
+
     try {
-      await deleteStudent(student.id);
-      await logActivity({
-        action: 'delete_student',
-        executorId: currentAdmin?.uid || 'unknown',
-        executorName: currentAdmin?.fullName || 'Admin',
-        executorEmail: currentAdmin?.email || '',
-        targetId: student.id,
-        targetEmail: student.email
+      const response = await deleteUserCompletely({
+        targetUid: student.id,
+        targetEmail: student.email,
+        confirmationName: confirmText.trim()
       });
-      toast.success('Alumno eliminado permanentemente');
-      navigate('/admin/students');
-    } catch (error) {
+
+      if (response.success) {
+        toast.success(`Alumno eliminado permanentemente. ${response.summary?.diagnosticsArchived || 0} diagnósticos archivados, ${response.summary?.invitationsDeleted || 0} invitaciones borradas.`);
+        navigate('/admin/students');
+      } else {
+        setDeleteError(response.error || 'Error desconocido');
+      }
+    } catch (error: any) {
       console.error(error);
-      toast.error('Error al eliminar alumno');
+      setDeleteError(error.message || 'Error al comunicarse con el servidor');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -111,7 +123,7 @@ export default function AdminStudentDetail() {
           <ChevronLeft size={16} /> Volver a alumnos
         </Link>
         
-        {isAdmin && (
+        {isAdmin && canDelete && student && (
           <button 
             onClick={() => setShowDeleteModal(true)}
             className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-red-500/60 hover:text-red-500 transition-colors"
@@ -230,47 +242,56 @@ export default function AdminStudentDetail() {
 
       {showDeleteModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="bg-sys-bg border border-sys-border p-8 rounded-xl w-full max-w-md card-geometric relative space-y-6">
-            <div className="flex flex-col items-center text-center space-y-4">
-              <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center">
-                <Trash2 size={32} />
+          <div className="bg-sys-bg border border-sys-border p-8 rounded-xl w-full max-w-lg card-geometric relative space-y-6">
+            <div className="flex flex-col items-center text-center space-y-3">
+              <div className="w-12 h-12 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center shrink-0">
+                <Trash2 size={24} />
               </div>
-              <h2 className="text-2xl font-black font-sans uppercase tracking-tight text-white line-height-1">¿Eliminar alumno?</h2>
+              <h2 className="text-xl font-bold font-sans uppercase tracking-tight text-white line-height-1">
+                Eliminar alumno permanentemente
+              </h2>
               <p className="text-sm text-sys-text-sec leading-relaxed">
-                Esta acción es irreversible y eliminará todos los datos, respuestas y diagnósticos de <span className="text-white font-bold">{student.fullName}</span>.
+                Esta acción borra la cuenta de Auth, el perfil y las invitaciones de <span className="text-white font-bold">{student.fullName}</span>. Los diagnósticos se archivan. No se puede deshacer.
               </p>
             </div>
 
-            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-sm flex items-start gap-3">
-              <AlertTriangle className="text-red-500 shrink-0" size={20} />
-              <div className="text-xs text-red-200/70 leading-tight italic">
-                El alumno no podrá volver a entrar a menos que sea invitado nuevamente. Su progreso se perderá totalmente.
+            {deleteError && (
+              <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-500 text-xs flex items-center gap-3 rounded-sm font-bold">
+                 <AlertTriangle size={18} className="shrink-0" />
+                 {deleteError}
               </div>
-            </div>
+            )}
 
             <div className="space-y-3">
                <label className="block text-xs font-black uppercase tracking-widest text-sys-text-mut text-center">
-                 Para confirmar, escribe el email: <span className="text-white select-all">{student.email}</span>
+                 Para confirmar, escribe el nombre completo del alumno: <span className="text-white font-bold">{student.fullName}</span>
                </label>
                <input 
                  type="text" 
-                 value={confirmEmail}
-                 onChange={e => setConfirmEmail(e.target.value)}
-                 className="w-full bg-sys-input border border-sys-border rounded p-3 text-sm focus:border-red-500 outline-none text-center text-white"
-                 placeholder="Email del alumno..."
+                 value={confirmText}
+                 onChange={e => setConfirmText(e.target.value)}
+                 className="w-full bg-sys-input border border-sys-border rounded p-3 text-sm focus:border-red-500 outline-none text-center font-mono text-white"
+                 placeholder="Escribe aquí..."
                />
             </div>
 
-            <div className="flex flex-col gap-3 pt-4">
+            <div className="flex flex-col gap-2 pt-2">
                <button 
-                 disabled={confirmEmail !== student.email}
+                 disabled={deleting || confirmText.trim().toLowerCase() !== (student.fullName || '').trim().toLowerCase()}
                  onClick={handleDelete} 
-                 className="w-full bg-red-500 text-white py-4 rounded-sm font-black uppercase tracking-widest text-xs disabled:opacity-30 transition-all hover:bg-red-600 shadow-xl shadow-red-500/20"
+                 className="w-full h-[48px] bg-red-500 text-white rounded-sm font-black uppercase tracking-widest text-xs disabled:opacity-30 transition-all hover:bg-red-600 shadow-xl shadow-red-500/20 flex items-center justify-center gap-2"
                >
-                 Eliminar permanentemente
+                 {deleting ? <Loader2 size={16} className="animate-spin" /> : 'Eliminar definitivamente'}
                </button>
-               <button onClick={() => setShowDeleteModal(false)} className="w-full py-3 text-sys-text-mut hover:text-white transition-colors text-xs font-black uppercase tracking-widest">
-                 Mejor no, cancelar
+               <button 
+                 disabled={deleting}
+                 onClick={() => {
+                   setShowDeleteModal(false);
+                   setDeleteError('');
+                 }} 
+                 className="w-full py-3 text-sys-text-mut hover:text-white transition-colors text-xs font-black uppercase tracking-widest disabled:opacity-50"
+               >
+                 Cancelar
                </button>
             </div>
           </div>

@@ -5,6 +5,62 @@ import path from "path";
 import { GoogleGenAI, Type } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 import fs from "fs";
+import admin from 'firebase-admin';
+
+let adminApp: admin.app.App | null = null;
+
+function getFirebaseAdmin(): admin.app.App {
+  if (adminApp) return adminApp;
+  
+  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (!serviceAccountJson || serviceAccountJson === 'MY_FIREBASE_SERVICE_ACCOUNT_JSON') {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON not configured in environment');
+  }
+  
+  let serviceAccount;
+  try {
+    serviceAccount = JSON.parse(serviceAccountJson);
+  } catch (e) {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON');
+  }
+  
+  adminApp = admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+  
+  return adminApp;
+}
+
+async function verifyAdminCaller(req: express.Request): Promise<{
+  uid: string;
+  email: string;
+  isSuperAdmin: boolean;
+  isAdmin: boolean;
+}> {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    throw new Error('UNAUTHORIZED: Missing or malformed Authorization header');
+  }
+  
+  const idToken = authHeader.substring(7);
+  const adminInstance = getFirebaseAdmin();
+  const decoded = await adminInstance.auth().verifyIdToken(idToken);
+  
+  const email = (decoded.email || '').toLowerCase();
+  
+  // IMPORTANTE: Mantener esta lista sincronizada con src/lib/admins.ts
+  const SUPER_ADMIN_EMAILS = ['emyr.arthuro@gmail.com'];
+  const ADMIN_EMAILS = ['info@emyrarthuro.com'];
+  
+  const isSuperAdmin = SUPER_ADMIN_EMAILS.includes(email);
+  const isAdmin = isSuperAdmin || ADMIN_EMAILS.includes(email);
+  
+  if (!isAdmin) {
+    throw new Error('FORBIDDEN: Caller is not admin');
+  }
+  
+  return { uid: decoded.uid, email, isSuperAdmin, isAdmin };
+}
 
 const getAI = () => {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
@@ -21,6 +77,157 @@ async function startServer() {
   app.use(express.json());
 
   // API endpoints
+  app.post("/api/admin/delete-user", async (req, res) => {
+    try {
+      console.log("[DELETE-USER] Request received for target:", req.body.targetEmail);
+      const caller = await verifyAdminCaller(req);
+      console.log(`[DELETE-USER] Caller verified: ${caller.email} (super_admin: ${caller.isSuperAdmin})`);
+
+      const { targetUid, targetEmail, confirmationName } = req.body;
+      if (!targetUid || !targetEmail || !confirmationName) {
+        return res.status(400).json({ error: "Missing targetUid, targetEmail or confirmationName" });
+      }
+
+      const SUPER_ADMIN_EMAILS = ['emyr.arthuro@gmail.com'];
+      const ADMIN_EMAILS = ['info@emyrarthuro.com'];
+
+      const normTargetEmail = targetEmail.toLowerCase();
+      
+      if (SUPER_ADMIN_EMAILS.includes(normTargetEmail)) {
+        return res.status(403).json({ error: "Cannot delete super admin" });
+      }
+      if (ADMIN_EMAILS.includes(normTargetEmail) && !caller.isSuperAdmin) {
+         return res.status(403).json({ error: "Only super_admin can delete admins" });
+      }
+      if (targetUid === caller.uid) {
+         return res.status(403).json({ error: "Cannot delete yourself" });
+      }
+
+      const adminInstance = getFirebaseAdmin();
+      const firestore = adminInstance.firestore();
+
+      const userDocRef = firestore.collection('users').doc(targetUid);
+      const userDocSnap = await userDocRef.get();
+      if (!userDocSnap.exists) {
+        return res.status(404).json({ error: "User profile not found in database" });
+      }
+
+      const userData = userDocSnap.data()!;
+      if ((userData.email || '').toLowerCase() !== normTargetEmail) {
+        return res.status(400).json({ error: "Email mismatch — refresh and retry" });
+      }
+
+      // Both target.fullName and target.name could be used
+      const targetName = (userData.fullName || userData.name || '').toLowerCase().trim();
+      if (targetName !== confirmationName.toLowerCase().trim()) {
+         return res.status(400).json({ error: "Confirmation name does not match" });
+      }
+
+      console.log("[DELETE-USER] Protections passed for target:", targetEmail);
+
+      let diagnosticsArchived = 0;
+      let invitationsDeleted = 0;
+      let authAccountDeleted = false;
+      const errors: string[] = [];
+
+      // i) Archive diagnostics
+      try {
+        const diagnosticsSnapshot = await firestore.collection('diagnostics').where('uid', '==', targetUid).get();
+        for (const doc of diagnosticsSnapshot.docs) {
+          const archivedData = {
+            ...doc.data(),
+            archivedAt: admin.firestore.FieldValue.serverTimestamp(),
+            archivedBy: caller.uid,
+            archivedByEmail: caller.email,
+            reason: 'user_deleted'
+          };
+          await firestore.collection('diagnostics_archived').doc(doc.id).set(archivedData);
+          await doc.ref.delete();
+          diagnosticsArchived++;
+        }
+        console.log(`[DELETE-USER] Archived ${diagnosticsArchived} diagnostics`);
+      } catch (err: any) {
+        errors.push(`Diagnostics archive error: ${err.message}`);
+        console.error("Diagnostics archive error:", err);
+      }
+
+      // ii) Delete invitations
+      try {
+        const invitationsSnapshot = await firestore.collection('invitations').where('email', '==', normTargetEmail).get();
+        for (const doc of invitationsSnapshot.docs) {
+           await doc.ref.delete();
+           invitationsDeleted++;
+        }
+        console.log(`[DELETE-USER] Deleted ${invitationsDeleted} invitations`);
+      } catch (err: any) {
+         errors.push(`Invitations delete error: ${err.message}`);
+         console.error("Invitations delete error:", err);
+      }
+
+      // iii) Delete user profile
+      try {
+        await userDocRef.delete();
+        console.log("[DELETE-USER] Deleted user profile");
+      } catch (err: any) {
+         errors.push(`User profile delete error: ${err.message}`);
+         console.error("User profile delete error:", err);
+      }
+
+      // iv) Delete Auth account
+      try {
+        await adminInstance.auth().deleteUser(targetUid);
+         authAccountDeleted = true;
+         console.log("[DELETE-USER] Deleted Auth account");
+      } catch (err: any) {
+         if (err.code === 'auth/user-not-found') {
+            console.log("[DELETE-USER] Auth account already didn't exist");
+            authAccountDeleted = true; // functionally deleted
+         } else {
+            console.error("Auth delete error:", err);
+            errors.push(`Auth account delete error: ${err.message}`);
+         }
+      }
+
+      // v) Audit log
+      let auditLogId = '';
+      try {
+        const auditLogRef = await firestore.collection('audit_log').add({
+           action: 'delete_user',
+           targetUid,
+           targetEmail,
+           targetName: userData.fullName || userData.name || null,
+           performedBy: caller.uid,
+           performedByEmail: caller.email,
+           performedAt: admin.firestore.FieldValue.serverTimestamp(),
+           diagnosticsArchived,
+           invitationsDeleted,
+           authAccountDeleted,
+           errors
+        });
+        auditLogId = auditLogRef.id;
+        console.log("[DELETE-USER] Audit log written");
+      } catch (err: any) {
+         console.error("Audit log error:", err);
+      }
+
+      res.status(200).json({
+        success: true,
+        summary: {
+           diagnosticsArchived,
+           invitationsDeleted,
+           authAccountDeleted,
+           auditLogId
+        }
+      });
+    } catch (err: any) {
+      if (err.message?.startsWith('UNAUTHORIZED') || err.message?.startsWith('FORBIDDEN')) {
+         return res.status(403).json({ error: err.message });
+      }
+      console.error("[DELETE-USER] Unhandled error:", err);
+      res.status(500).json({ error: err.message || "Internal server error" });
+    }
+  });
+
   app.post("/api/analyze", async (req, res) => {
     try {
       const { variables, affinityRank, textAnswers } = req.body;

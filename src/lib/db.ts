@@ -118,13 +118,40 @@ export async function deleteInvitation(id: string) {
   }
 }
 
-export async function deleteStudent(uid: string) {
+export async function deleteUserCompletely(params: {
+  targetUid: string;
+  targetEmail: string;
+  confirmationName: string;
+}): Promise<{
+  success: boolean;
+  summary?: any;
+  error?: string;
+}> {
   try {
-    // 1. Delete diagnosis
-    await deleteDoc(doc(db, 'diagnostics', uid));
-    // 2. Delete user profile
-    await deleteDoc(doc(db, 'users', uid));
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, `students/${uid}`);
+    const { auth } = await import('./firebase');
+    const user = auth.currentUser;
+    if (!user) throw new Error('No authenticated user');
+    
+    const idToken = await user.getIdToken();
+    
+    const response = await fetch('/api/admin/delete-user', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idToken}`
+      },
+      body: JSON.stringify(params)
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      return { success: false, error: data.error || `HTTP ${response.status}` };
+    }
+    
+    return { success: true, summary: data.summary };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Network error' };
   }
 }
+

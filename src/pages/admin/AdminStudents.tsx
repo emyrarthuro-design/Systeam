@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, getDocs, orderBy, where, onSnapshot } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
-import { Search, Download, FileText, CheckCircle, Trash2, Shield, AlertTriangle, Check, User } from 'lucide-react';
+import { Search, Download, FileText, CheckCircle, Trash2, Shield, AlertTriangle, Check, User, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { downloadCSV } from '../../lib/csv';
 import { formatDate, formatIso, parseDate } from '../../lib/dateUtils';
 import { useAuth } from '../../components/AuthProvider';
-import { logActivity, deleteStudent } from '../../lib/db';
+import { logActivity, deleteUserCompletely } from '../../lib/db';
 import { toast } from 'react-hot-toast';
 
 export default function AdminStudents() {
@@ -14,10 +14,11 @@ export default function AdminStudents() {
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   
   // Selection
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [showDeleteModal, setShowDeleteModal] = useState<any>(null); // { type: 'single' | 'bulk', data: any }
+  const [showDeleteModal, setShowDeleteModal] = useState<any>(null); // data: any
   const [confirmText, setConfirmText] = useState('');
 
   useEffect(() => {
@@ -91,67 +92,40 @@ export default function AdminStudents() {
   };
 
   const executeDelete = async () => {
-    const expectedConfirmText = showDeleteModal.type === 'bulk' ? `ELIMINAR ${selectedIds.length}` : 'ELIMINAR';
-    if (confirmText !== expectedConfirmText) {
+    if (!showDeleteModal) return;
+    const student = showDeleteModal;
+    const expectedConfirmText = (student.fullName || student.name || '').trim().toLowerCase();
+    
+    if (confirmText.trim().toLowerCase() !== expectedConfirmText) {
       return;
     }
 
+    setDeleting(true);
+    setDeleteError('');
+
     try {
-      if (showDeleteModal.type === 'single') {
-        const student = showDeleteModal.data;
-        await deleteStudent(student.id);
-        await logActivity({
-          action: 'delete_student',
-          executorId: currentAdmin?.uid || 'unknown',
-          executorName: currentAdmin?.fullName || 'Admin',
-          executorEmail: currentAdmin?.email || '',
-          targetId: student.id,
-          targetEmail: student.email
-        });
+      const response = await deleteUserCompletely({
+        targetUid: student.id,
+        targetEmail: student.email,
+        confirmationName: confirmText.trim()
+      });
+
+      if (response.success) {
+        toast.success(`Alumno eliminado permanentemente. ${response.summary?.diagnosticsArchived || 0} diagnósticos archivados, ${response.summary?.invitationsDeleted || 0} invitaciones borradas.`);
+        setShowDeleteModal(null);
+        setConfirmText('');
       } else {
-        // Bulk delete
-        for (const id of selectedIds) {
-          const student = students.find(s => s.id === id);
-          await deleteStudent(id);
-          if (student) {
-            await logActivity({
-              action: 'delete_student',
-              executorId: currentAdmin?.uid || 'unknown',
-              executorName: currentAdmin?.fullName || 'Admin',
-              executorEmail: currentAdmin?.email || '',
-              targetId: id,
-              targetEmail: student.email
-            });
-          }
-        }
-        setSelectedIds([]);
+        setDeleteError(response.error || 'Error desconocido');
       }
-      toast.success('Alumno(s) eliminado(s) permanentemente');
-      setShowDeleteModal(null);
-      setConfirmText('');
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error('Error al realizar la eliminación');
+      setDeleteError(error.message || 'Error al comunicarse con el servidor');
+    } finally {
+      setDeleting(false);
     }
   };
 
   const filteredStudents = students.filter(s => (s.fullName + s.email).toLowerCase().includes(search.toLowerCase()));
-
-  const toggleSelectAll = () => {
-    if (selectedIds.length === filteredStudents.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(filteredStudents.map(s => s.id));
-    }
-  };
-
-  const toggleSelect = (id: string) => {
-    if (selectedIds.includes(id)) {
-      setSelectedIds(selectedIds.filter(i => i !== id));
-    } else {
-      setSelectedIds([...selectedIds, id]);
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -161,29 +135,6 @@ export default function AdminStudents() {
           <Download size={16} /> Exportar CSV
         </button>
       </div>
-
-      {selectedIds.length > 0 && isAdmin && (
-        <div className="sticky top-4 z-40 bg-red-600 shadow-2xl p-4 rounded-sm flex items-center justify-between text-white animate-in slide-in-from-top-4">
-          <div className="font-black uppercase tracking-widest text-xs flex items-center gap-2">
-            <span className="bg-white text-red-600 px-2 py-1 rounded">{selectedIds.length}</span>
-            Alumnos seleccionados
-          </div>
-          <div className="flex gap-2">
-            <button onClick={() => setSelectedIds([])} className="px-4 py-2 border border-white/20 hover:bg-white/10 rounded-sm text-xs font-bold uppercase transition-colors">
-              Cancelar
-            </button>
-            <button 
-              onClick={() => {
-                setShowDeleteModal({ type: 'bulk', data: null });
-                setConfirmText('');
-              }}
-              className="px-4 py-2 bg-white text-red-600 hover:bg-white/90 rounded-sm text-xs font-black uppercase flex items-center gap-2 transition-transform hover:scale-105 active:scale-95"
-            >
-              <Trash2 size={14} /> Eliminar permanentemente
-            </button>
-          </div>
-        </div>
-      )}
 
       <div className="card-geometric p-0 overflow-hidden flex flex-col">
           <div className="p-4 border-b border-sys-border flex gap-4">
@@ -203,11 +154,6 @@ export default function AdminStudents() {
              <table className="w-full text-left text-sm whitespace-nowrap">
                <thead className="bg-sys-input/50 text-sys-text-sec text-[10px] uppercase font-black tracking-widest">
                  <tr>
-                   <th className="px-6 py-3">
-                     <button onClick={toggleSelectAll} className="w-5 h-5 rounded border border-sys-border flex items-center justify-center bg-sys-bg text-sys-accent transition-colors hover:border-sys-accent">
-                        {selectedIds.length === filteredStudents.length && filteredStudents.length > 0 && <Check size={14} />}
-                     </button>
-                   </th>
                    <th className="px-6 py-3">Alumno</th>
                    <th className="px-6 py-3">Progreso</th>
                    <th className="px-6 py-3">Estado</th>
@@ -218,14 +164,11 @@ export default function AdminStudents() {
                </thead>
                <tbody className="divide-y divide-sys-border">
                   {filteredStudents.map(student => {
-                    const isSelected = selectedIds.includes(student.id);
+                    const isSystemAdmin = student.role === 'admin' || student.role === 'super_admin';
+                    const canDelete = isSuperAdmin || (!isSystemAdmin);
+
                     return (
-                    <tr key={student.id} className={`hover:bg-sys-input/30 group transition-colors ${isSelected ? 'bg-red-500/5' : ''}`}>
-                      <td className="px-6 py-4">
-                        <button onClick={() => toggleSelect(student.id)} className={`w-5 h-5 rounded border transition-colors flex items-center justify-center ${isSelected ? 'bg-red-600 border-red-600 text-white' : 'border-sys-border bg-sys-bg text-transparent hover:border-red-600'}`}>
-                            <Check size={14} />
-                        </button>
-                      </td>
+                    <tr key={student.id} className={`hover:bg-sys-input/30 group transition-colors`}>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3 text-left">
                            <div className="w-8 h-8 rounded-full bg-sys-accent/20 text-sys-accent flex items-center justify-center font-bold text-xs uppercase border border-sys-accent/10">
@@ -277,11 +220,12 @@ export default function AdminStudents() {
                             <Link to={`/admin/students/${student.id}`} className="text-sys-bg bg-sys-text-sec hover:bg-sys-text-main py-1.5 px-4 text-[10px] font-black uppercase tracking-widest rounded-sm transition-all">
                                 Ver ficha
                             </Link>
-                            {isAdmin && (
+                            {isAdmin && canDelete && (
                               <button 
                                 onClick={() => {
-                                  setShowDeleteModal({ type: 'single', data: student });
+                                  setShowDeleteModal(student);
                                   setConfirmText('');
+                                  setDeleteError('');
                                 }}
                                 className="p-2 text-sys-text-mut hover:text-red-500 hover:bg-red-500/10 rounded-sm transition-all"
                               >
@@ -305,18 +249,23 @@ export default function AdminStudents() {
                 <Trash2 size={24} />
               </div>
               <h2 className="text-xl font-bold font-sans uppercase tracking-tight text-white line-height-1">
-                {showDeleteModal.type === 'bulk' ? `¿Eliminar ${selectedIds.length} alumnos?` : '¿Eliminar alumno?'}
+                Eliminar alumno permanentemente
               </h2>
               <p className="text-sm text-sys-text-sec leading-relaxed">
-                {showDeleteModal.type === 'single' 
-                  ? `Se eliminará permanentemente a ${showDeleteModal.data.fullName} y todos sus datos de diagnóstico.` 
-                  : `Se eliminarán permanentemente ${selectedIds.length} alumnos. Esta acción no se puede deshacer.`}
+                Esta acción borra la cuenta de Auth, el perfil y las invitaciones de <span className="text-white font-bold">{showDeleteModal.fullName}</span>. Los diagnósticos se archivan. No se puede deshacer.
               </p>
             </div>
 
+            {deleteError && (
+              <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-500 text-xs flex items-center gap-3 rounded-sm font-bold">
+                 <AlertTriangle size={18} className="shrink-0" />
+                 {deleteError}
+              </div>
+            )}
+
             <div className="space-y-3">
                <label className="block text-xs font-black uppercase tracking-widest text-sys-text-mut text-center">
-                 Para confirmar, escribe <span className="text-white">{"ELIMINAR" + (showDeleteModal.type === 'bulk' ? ` ${selectedIds.length}` : '')}</span>
+                 Para confirmar, escribe el nombre completo del alumno: <span className="text-white font-bold">{showDeleteModal.fullName}</span>
                </label>
                <input 
                  type="text" 
@@ -329,13 +278,20 @@ export default function AdminStudents() {
 
             <div className="flex flex-col gap-2 pt-2">
                <button 
-                 disabled={confirmText !== ('ELIMINAR' + (showDeleteModal.type === 'bulk' ? ` ${selectedIds.length}` : ''))}
+                 disabled={deleting || confirmText.trim().toLowerCase() !== (showDeleteModal.fullName || '').trim().toLowerCase()}
                  onClick={executeDelete} 
-                 className="w-full bg-red-500 text-white py-4 rounded-sm font-black uppercase tracking-widest text-xs disabled:opacity-30 transition-all hover:bg-red-600 shadow-xl shadow-red-500/20"
+                 className="w-full h-[48px] bg-red-500 text-white rounded-sm font-black uppercase tracking-widest text-xs disabled:opacity-30 transition-all hover:bg-red-600 shadow-xl shadow-red-500/20 flex items-center justify-center gap-2"
                >
-                 Confirmar eliminación permanente
+                 {deleting ? <Loader2 size={16} className="animate-spin" /> : 'Eliminar definitivamente'}
                </button>
-               <button onClick={() => setShowDeleteModal(null)} className="w-full py-3 text-sys-text-mut hover:text-white transition-colors text-xs font-black uppercase tracking-widest">
+               <button 
+                 disabled={deleting}
+                 onClick={() => {
+                   setShowDeleteModal(null);
+                   setDeleteError('');
+                 }} 
+                 className="w-full py-3 text-sys-text-mut hover:text-white transition-colors text-xs font-black uppercase tracking-widest disabled:opacity-50"
+               >
                  Cancelar
                </button>
             </div>

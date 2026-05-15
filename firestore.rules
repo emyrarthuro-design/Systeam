@@ -82,6 +82,18 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
     
+    // DIAGNOSTICS ARCHIVED
+    match /diagnostics_archived/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    
+    // AUDIT LOG
+    match /audit_log/{logId} {
+      allow read: if isSuperAdmin();
+      allow write: if false;
+    }
+    
     // INVITATIONS
     match /invitations/{invitationId} {
       allow read: if true; 
