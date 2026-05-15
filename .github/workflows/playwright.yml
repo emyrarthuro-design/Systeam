@@ -33,6 +33,7 @@ jobs:
         run: npx playwright install --with-deps
 
       - name: Run Playwright tests
+        id: playwright
         run: npx playwright test
 
       - name: Upload Playwright report
@@ -41,3 +42,21 @@ jobs:
         with:
           name: playwright-report
           path: playwright-report/
+
+      - name: Notify Make on failure
+        if: failure()
+        env:
+          MAKE_WEBHOOK_URL: ${{ secrets.MAKE_WEBHOOK_URL }}
+        run: |
+          curl -X POST "$MAKE_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "project": "Systeam",
+              "status": "failed",
+              "repository": "${{ github.repository }}",
+              "branch": "${{ github.ref_name }}",
+              "commit": "${{ github.sha }}",
+              "workflow": "${{ github.workflow }}",
+              "run_id": "${{ github.run_id }}",
+              "run_url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }'
