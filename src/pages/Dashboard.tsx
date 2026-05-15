@@ -125,14 +125,14 @@ export default function Dashboard() {
             Hola{profile?.fullName ? <>, <span className="text-amber-500">{profile.fullName.split(' ')[0]}</span></> : ''}
           </h1>
         </div>
-        {!isCompleted && (
-          <div className="text-slate-500 text-sm max-w-sm flex flex-col items-end gap-2">
-            <p className="text-right font-medium text-slate-400">Bienvenido a la Incubadora SysTeam. Completa los 8 bloques para recibir tu diagnóstico estratégico.</p>
-            <button onClick={() => setShowRestartConfirm(true)} className="text-[10px] text-rose-500 hover:text-rose-400 uppercase font-bold tracking-widest transition-colors py-1">
-               Reiniciar diagnóstico (Borrar todo)
-            </button>
-          </div>
-        )}
+        <div className="text-slate-500 text-sm max-w-sm flex flex-col items-end gap-2">
+          {!isCompleted && (
+            <p className="text-right font-medium text-slate-400">Bienvenido a la Incubadora SysTeam. Completa los 8 bloques para recibir tu diagnóstico.</p>
+          )}
+          <button onClick={() => setShowRestartConfirm(true)} className="text-[10px] text-rose-500 hover:text-rose-400 uppercase font-bold tracking-widest transition-colors py-1">
+             Reiniciar diagnóstico (Borrar todo)
+          </button>
+        </div>
       </header>
 
       {isCompleted && (

@@ -41,24 +41,67 @@ export default function Results() {
     loadData();
   }, [user]);
 
-  const handleRedoDiagnosis = () => {
+  const handleRedoDiagnosis = async () => {
     if (!user) return;
     if (window.confirm("¿Estás seguro de que deseas borrar este análisis por completo e iniciar de nuevo? Esta acción eliminará todas tus respuestas y no se puede deshacer.")) {
       try {
         const newData = {
           uid: user.uid,
+          userEmail: user.email || '',
+          userName: '',
           answers: {},
           progress: 0,
-          status: 'not_started' as const,
+          status: 'in_progress' as const,
           createdAt: new Date().toISOString(),
+          startedAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           currentBlock: 1
-        };
+        } as Diagnosis;
+        
+        const { saveDiagnosisDebounced, updateUserDiagnosisStatus } = await import('../lib/db');
+        await saveDiagnosisDebounced(user.uid, newData);
+        await updateUserDiagnosisStatus(user.uid, 'in_progress');
+        
         localStorage.setItem('systeam_diagnosis', JSON.stringify(newData));
-        navigate('/diagnosis/1');
+        navigate('/bloque/1');
       } catch (err) {
         console.error("Error restarting diagnosis:", err);
         alert("Hubo un error al reiniciar el diagnóstico.");
+      }
+    }
+  };
+
+  const handleRegenerateAnalysis = async () => {
+    if (!user || !diagnosis) return;
+    if (window.confirm("¿Estás seguro de que deseas regenerar el análisis? Esto usará tus respuestas guardadas y creará un nuevo diagnóstico final.")) {
+      try {
+        setLoading(true);
+        const { calculateCapa1, calculateCapa2, extractTextAnswers } = await import('../lib/scoring');
+        const { generateDiagnosisReasoning } = await import('../lib/gemini');
+
+        const answersObj = diagnosis.answers || {};
+        const scores = calculateCapa1(answersObj);
+        const affinities = calculateCapa2(scores);
+        const textualAnswers = extractTextAnswers(answersObj);
+
+        const aiAnalysisData = await generateDiagnosisReasoning(scores, affinities, textualAnswers);
+
+        const updatedData: Diagnosis = {
+          ...diagnosis,
+          analysis: aiAnalysisData,
+          updatedAt: new Date().toISOString()
+        };
+        
+        const { saveDiagnosisDebounced } = await import('../lib/db');
+        await saveDiagnosisDebounced(user.uid, updatedData);
+        
+        localStorage.setItem('systeam_diagnosis', JSON.stringify(updatedData));
+        setDiagnosis(updatedData);
+      } catch (err: any) {
+        console.error("Error regenerating analysis:", err);
+        alert("Hubo un error al regenerar el análisis: " + (err.message || String(err)));
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -115,6 +158,12 @@ export default function Results() {
             Volver al Panel
           </Link>
           <div className="flex items-center gap-4">
+            <button 
+              onClick={handleRegenerateAnalysis}
+              className="text-xs uppercase font-bold text-amber-500 hover:text-amber-400 flex items-center gap-2 py-2 px-3 border border-amber-500/30 hover:bg-amber-500/10 rounded-sm transition-colors"
+            >
+              <RotateCcw size={14} /> Regenerar Análisis (IA)
+            </button>
             <button 
               onClick={handleRedoDiagnosis}
               className="text-xs uppercase font-bold text-rose-500 hover:text-rose-400 flex items-center gap-2 py-2 px-3 border border-rose-500/30 hover:bg-rose-500/10 rounded-sm transition-colors"
