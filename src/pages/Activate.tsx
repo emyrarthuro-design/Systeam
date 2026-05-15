@@ -125,15 +125,11 @@ export default function Activate() {
     } catch (err: any) {
       console.error(err);
       if (err.code === 'auth/email-already-in-use') {
-        const usersQ = query(collection(db, 'users'), where('email', '==', invitation.email));
-        const usersSnap = await getDocs(usersQ);
-        if (!usersSnap.empty) {
-          setErrorType('already_active');
-          setStep(2);
-        } else {
-          console.log('[ACTIVATE-RECOVER] Detected orphaned auth account for email:', invitation.email);
-          setStep(5);
-        }
+        console.log('[ACTIVATE-RECOVER] Detected existing auth account for email:', 
+                    invitation.email, '- routing to recovery flow');
+        setStep(5);
+        setCreating(false);
+        return;
       } else if (err.code === 'auth/weak-password') {
         setGlobalError('La contraseña no cumple los requisitos.');
       } else if (err.code === 'auth/network-request-failed') {
@@ -172,7 +168,11 @@ export default function Activate() {
           status: 'activated',
           activatedAt: serverTimestamp()
         });
-        console.log('[ACTIVATE] Invitation marked as used:', invitation.id);
+        if (invitation.status === 'activated') {
+          console.log('[ACTIVATE-RECOVER] Invitation already activated, re-marking for audit');
+        } else {
+          console.log('[ACTIVATE] Invitation marked as used:', invitation.id);
+        }
       } catch (err) {
         console.error('[ACTIVATE] Failed to mark invitation as used:', { invitationId: invitation.id, error: err });
       }
@@ -526,8 +526,8 @@ export default function Activate() {
                 <div className="w-16 h-16 bg-blue-500/10 border border-blue-500/30 rounded-full flex items-center justify-center text-blue-500 mx-auto mb-6">
                   <User size={32} />
                 </div>
-                <h2 className="text-2xl font-black text-white uppercase tracking-tight mb-2">Ya tenés una cuenta</h2>
-                <p className="text-slate-400 text-sm font-medium">Iniciá sesión para completar tu activación.</p>
+                <h2 className="text-2xl font-black text-white uppercase tracking-tight mb-2">Ya tenés una cuenta con este email</h2>
+                <p className="text-slate-400 text-sm font-medium">Iniciá sesión con tu contraseña para continuar.</p>
               </div>
 
               {globalError && (
