@@ -1,5 +1,5 @@
 import dotenv from "dotenv";
-dotenv.config({ override: true });
+dotenv.config();
 import express from "express";
 import path from "path";
 import { GoogleGenAI, Type } from "@google/genai";
@@ -8,6 +8,12 @@ import fs from "fs";
 import admin from 'firebase-admin';
 
 let adminApp: admin.app.App | null = null;
+
+// IMPORTANTE: Mantener esta lista sincronizada con src/lib/admins.ts
+// y con firestore.rules. Hardcodeado aquí porque el backend Node 
+// no puede importar TypeScript del frontend sin builds extra.
+const SUPER_ADMIN_EMAILS = ['emyr.arthuro@gmail.com'];
+const ADMIN_EMAILS = ['info@emyrarthuro.com'];
 
 function getFirebaseAdmin(): admin.app.App {
   if (adminApp) return adminApp;
@@ -48,10 +54,6 @@ async function verifyAdminCaller(req: express.Request): Promise<{
   
   const email = (decoded.email || '').toLowerCase();
   
-  // IMPORTANTE: Mantener esta lista sincronizada con src/lib/admins.ts
-  const SUPER_ADMIN_EMAILS = ['emyr.arthuro@gmail.com'];
-  const ADMIN_EMAILS = ['info@emyrarthuro.com'];
-  
   const isSuperAdmin = SUPER_ADMIN_EMAILS.includes(email);
   const isAdmin = isSuperAdmin || ADMIN_EMAILS.includes(email);
   
@@ -87,9 +89,6 @@ async function startServer() {
       if (!targetUid || !targetEmail || !confirmationName) {
         return res.status(400).json({ error: "Missing targetUid, targetEmail or confirmationName" });
       }
-
-      const SUPER_ADMIN_EMAILS = ['emyr.arthuro@gmail.com'];
-      const ADMIN_EMAILS = ['info@emyrarthuro.com'];
 
       const normTargetEmail = targetEmail.toLowerCase();
       

@@ -28,7 +28,7 @@ export default function AdminStudents() {
       try {
         const diagsSnap = await getDocs(collection(db, 'diagnostics'));
         const diagMap = new Map();
-        diagsSnap.forEach(d => diagMap.set(d.data().userId, d.data()));
+        diagsSnap.forEach(d => diagMap.set(d.id, d.data()));
 
         const studentData: any[] = [];
         snap.forEach(u => {
@@ -40,11 +40,11 @@ export default function AdminStudents() {
           if (diag) {
             if (diag.status === 'completed') {
               progressPct = 100;
-            } else if (diag.responses) {
+            } else if (diag.answers) {
               // Count blocks answered (1-8)
               const answeredBlocks = new Set();
-              Object.keys(diag.responses).forEach(key => {
-                const blockMatch = key.match(/^block(\d+)/);
+              Object.keys(diag.answers).forEach(key => {
+                const blockMatch = key.match(/^block_(\d+)/);
                 if (blockMatch) answeredBlocks.add(blockMatch[1]);
               });
               progressPct = Math.round((answeredBlocks.size / 8) * 100);
@@ -56,7 +56,7 @@ export default function AdminStudents() {
             diagnosticData: diag,
             progressPct,
             diagnosticStatus: diag ? diag.status : 'not_started',
-            profile: diag ? diag.result?.primaryProfile : null,
+            profile: diag ? (diag.analysis?.perfil_predominante || diag.result?.primaryProfile) : null,
           });
         });
         

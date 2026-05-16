@@ -2,13 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { ChevronLeft, Save, Loader2, Trash2, AlertTriangle, Shield, History } from 'lucide-react';
+import { ChevronLeft, Save, Loader2, Trash2, AlertTriangle, Shield, History, RotateCcw } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { formatDateTime } from '../../lib/dateUtils';
 import { useAuth } from '../../components/AuthProvider';
 import { useNavigate } from 'react-router-dom';
 import { logActivity, deleteUserCompletely } from '../../lib/db';
 import { toast } from 'react-hot-toast';
+import { DiagnosisReport } from '../../components/DiagnosisReport';
 
 export default function AdminStudentDetail() {
   const { id } = useParams();
@@ -54,6 +55,44 @@ export default function AdminStudentDetail() {
     }
     loadData();
   }, [id]);
+
+  const [regenerating, setRegenerating] = useState(false);
+
+  const handleRegenerateAnalysis = async () => {
+    if (!student || !diagnosis) return;
+    if (window.confirm("¿Estás seguro de que deseas regenerar el análisis? Esto sobreescribirá el diagnóstico actual.")) {
+      try {
+        setRegenerating(true);
+        const { calculateCapa1, calculateCapa2, extractTextAnswers } = await import('../../lib/scoring');
+        const { generateDiagnosisReasoning } = await import('../../lib/gemini');
+        
+        const answersObj = diagnosis.answers || {};
+        const scores = calculateCapa1(answersObj);
+        const affinities = calculateCapa2(scores);
+        const textualAnswers = extractTextAnswers(answersObj);
+
+        const aiAnalysisData = await generateDiagnosisReasoning(scores, affinities, textualAnswers);
+
+        const updatedData = {
+          ...diagnosis,
+          analysis: aiAnalysisData,
+          updatedAt: new Date().toISOString()
+        };
+        
+        const { doc, setDoc } = await import('firebase/firestore');
+        const { db } = await import('../../lib/firebase');
+        await setDoc(doc(db, 'diagnostics', student.id), updatedData, { merge: true });
+        
+        setDiagnosis(updatedData);
+        toast.success('Análisis regenerado con éxito');
+      } catch (err: any) {
+        console.error("Error regenerating analysis:", err);
+        toast.error("Hubo un error al regenerar el análisis: " + (err.message || String(err)));
+      } finally {
+        setRegenerating(false);
+      }
+    }
+  };
 
   const handleSaveNotes = async () => {
     if(!id) return;
@@ -145,9 +184,9 @@ export default function AdminStudentDetail() {
             }`}>
               {diagnosis?.status === 'completed' ? 'COMPLETADO' : diagnosis?.status === 'in_progress' ? 'EN PROGRESO' : 'NO INICIADO'}
             </span>
-            {diagnosis?.result?.primaryProfile && (
+            { (diagnosis?.analysis?.perfil_predominante || diagnosis?.result?.primaryProfile) && (
                <span className="px-2 py-1 bg-sys-accent/10 text-sys-accent border border-sys-accent/30 rounded text-xs">
-                 Predominante: {diagnosis.result.primaryProfile}
+                 Predominante: {diagnosis?.analysis?.perfil_predominante || diagnosis?.result?.primaryProfile}
                </span>
             )}
          </div>
@@ -169,13 +208,37 @@ export default function AdminStudentDetail() {
       
       <div className="mt-6">
         {activeTab === 'ficha' && (
-           <div className="card-geometric">
-             {diagnosis?.result ? (
-                <div className="prose prose-invert max-w-none">
-                  <ReactMarkdown>{diagnosis.result.feedback || '*No hay feedback generado*'}</ReactMarkdown>
+           <div className="card-geometric relative">
+             {diagnosis && diagnosis.status === 'completed' && (
+               <div className="absolute top-4 right-4 z-10 flex gap-2">
+                 <button
+                   onClick={handleRegenerateAnalysis}
+                   disabled={regenerating}
+                   className="text-xs font-bold uppercase tracking-widest bg-sys-input hover:bg-sys-border text-sys-text-main px-3 py-1.5 rounded-sm transition-colors flex items-center gap-2"
+                 >
+                   {regenerating ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                   {regenerating ? 'Regenerando...' : 'Regenerar Análisis AI'}
+                 </button>
+               </div>
+             )}
+             
+             {diagnosis?.analysis ? (
+                <div className="pt-8">
+                  <DiagnosisReport diagnosis={diagnosis} />
                 </div>
              ) : (
-                <div className="text-sys-text-mut text-center py-8">El alumno aún no ha completado el diagnóstico o no se generaron resultados.</div>
+                <div className="text-sys-text-mut text-center py-12">
+                  <p className="mb-4">El alumno aún no ha completado el diagnóstico o no se generaron resultados.</p>
+                  {diagnosis && diagnosis.status === 'completed' && (
+                    <button
+                      onClick={handleRegenerateAnalysis}
+                      disabled={regenerating}
+                      className="text-xs font-bold uppercase tracking-widest bg-sys-accent/20 hover:bg-sys-accent text-sys-accent hover:text-white px-4 py-2 rounded-sm transition-colors"
+                    >
+                       {regenerating ? 'Regenerando...' : 'Generar Análisis ahora'}
+                    </button>
+                  )}
+                </div>
              )}
            </div>
         )}
@@ -215,9 +278,9 @@ export default function AdminStudentDetail() {
         )}
         {activeTab === 'respuestas' && (
            <div className="card-geometric">
-             {diagnosis?.responses ? (
+             {diagnosis?.answers ? (
                 <pre className="text-xs bg-sys-input p-4 rounded overflow-auto max-h-[500px] border border-sys-border">
-                   {JSON.stringify(diagnosis.responses, null, 2)}
+                   {JSON.stringify(diagnosis.answers, null, 2)}
                 </pre>
              ) : (
                 <div className="text-sys-text-mut text-center py-8">No hay respuestas registradas.</div>

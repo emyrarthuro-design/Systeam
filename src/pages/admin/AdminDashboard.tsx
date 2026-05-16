@@ -73,13 +73,16 @@ export default function AdminDashboard() {
           pendingInvites: pendingInv
         });
         
-        const recentQ = query(collection(db, 'diagnostics'), orderBy('completedAt', 'desc'), limit(5));
-        const recentSnap = await getDocs(recentQ);
         const recentList: any[] = [];
-        recentSnap.forEach(d => {
+        diagSnap.forEach(d => {
           if(d.data().status === 'completed') recentList.push({ id: d.id, ...d.data() });
         });
-        setRecent(recentList);
+        recentList.sort((a,b) => {
+          const dateA = a.completedAt ? parseDate(a.completedAt)?.getTime() || 0 : 0;
+          const dateB = b.completedAt ? parseDate(b.completedAt)?.getTime() || 0 : 0;
+          return dateB - dateA;
+        });
+        setRecent(recentList.slice(0, 5));
       } catch (err: any) {
         console.error("Error in AdminDashboard loadData:", err);
       }
@@ -172,8 +175,54 @@ export default function AdminDashboard() {
         ))}
       </div>
       
-      {/* Distribución de perfiles placeholder */}
-      {/* Últimos completados placeholder */}
+      {/* Últimos completados */}
+      <div className="card-geometric p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold font-sans">Últimos Completados</h2>
+          <Link to="/admin/students" className="text-xs font-bold uppercase tracking-widest text-sys-accent hover:underline">
+            Ver todos →
+          </Link>
+        </div>
+        
+        {recent.length === 0 ? (
+          <div className="text-sys-text-mut text-sm py-4 text-center border-t border-sys-border">
+            No hay diagnósticos completados recientemente.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead className="text-sys-text-sec text-[10px] uppercase font-black tracking-widest border-b border-sys-border">
+                <tr>
+                  <th className="pb-3 pr-6">Alumno</th>
+                  <th className="pb-3 px-6">Fecha completado</th>
+                  <th className="pb-3 px-6">Perfil predominante</th>
+                  <th className="pb-3 px-6 text-right"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-sys-border">
+                {recent.map((diag) => (
+                  <tr key={diag.id} className="hover:bg-sys-input/30 transition-colors">
+                    <td className="py-4 pr-6">
+                      <div className="font-bold text-sys-text-main">{diag.userName || 'Usuario'}</div>
+                    </td>
+                    <td className="py-4 px-6 text-sys-text-mut">
+                      {diag.completedAt ? parseDate(diag.completedAt)?.toLocaleDateString() : 'N/A'}
+                    </td>
+                    <td className="py-4 px-6 text-sys-text-sec">
+                      {diag.analysis?.perfil_predominante || diag.result?.primaryProfile || '—'}
+                    </td>
+                    <td className="py-4 pl-6 text-right">
+                      <Link to={`/admin/students/${diag.id}`} className="text-xs font-bold bg-sys-input hover:bg-sys-border px-3 py-1.5 rounded-sm transition-colors text-sys-text-main">
+                        Ver ficha
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
