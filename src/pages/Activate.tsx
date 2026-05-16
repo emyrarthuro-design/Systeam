@@ -38,18 +38,26 @@ export default function Activate() {
     setErrorType('none');
     
     try {
-      // Find invitation by normalized email
-      const invQ = query(collection(db, 'invitations'), where('email', '==', normalizedInput));
-      const invSnap = await getDocs(invQ);
+      const response = await fetch('/api/invitations/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedInput })
+      });
       
-      if (invSnap.empty) {
-        setErrorType('not_found');
+      const result = await response.json();
+      
+      if (!response.ok || !result.invitation) {
+        if (response.status === 429) {
+          setErrorType('not_found'); // Mute it as not_found or better, show error
+          setGlobalError(result.error);
+        } else {
+          setErrorType('not_found');
+        }
         setStep(2);
         return;
       }
       
-      const invDoc = invSnap.docs[0];
-      const invData = { id: invDoc.id, ...invDoc.data() } as Invitation;
+      const invData = result.invitation as Invitation;
       
       if (invData.status === 'activated') {
         setErrorType('already_active');
@@ -105,11 +113,20 @@ export default function Activate() {
 
       // 3. Update invitation
       try {
-        await updateDoc(doc(db, 'invitations', invitation.id), {
-          status: 'activated',
-          activatedAt: serverTimestamp()
+        const idToken = await newUser.getIdToken();
+        const response = await fetch('/api/invitations/activate', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+          },
+          body: JSON.stringify({ invitationId: invitation.id })
         });
-        console.log('[ACTIVATE] Invitation marked as used:', invitation.id);
+        
+        if (!response.ok) {
+          throw new Error('API returned an error');
+        }
+        console.log('[ACTIVATE] Invitation marked as used via API:', invitation.id);
       } catch (err) {
         console.error('[ACTIVATE] Failed to mark invitation as used:', 
           { invitationId: invitation.id, error: err });
@@ -164,14 +181,24 @@ export default function Activate() {
       console.log('[ACTIVATE-RECOVER] Profile created/merged:', user.uid);
 
       try {
-        await updateDoc(doc(db, 'invitations', invitation.id), {
-          status: 'activated',
-          activatedAt: serverTimestamp()
+        const idToken = await user.getIdToken();
+        const response = await fetch('/api/invitations/activate', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+          },
+          body: JSON.stringify({ invitationId: invitation.id })
         });
+        
+        if (!response.ok) {
+          throw new Error('API returned an error');
+        }
+        
         if (invitation.status === 'activated') {
           console.log('[ACTIVATE-RECOVER] Invitation already activated, re-marking for audit');
         } else {
-          console.log('[ACTIVATE] Invitation marked as used:', invitation.id);
+          console.log('[ACTIVATE] Invitation marked as used via API:', invitation.id);
         }
       } catch (err) {
         console.error('[ACTIVATE] Failed to mark invitation as used:', { invitationId: invitation.id, error: err });

@@ -6,6 +6,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 import fs from "fs";
 import admin from 'firebase-admin';
+import rateLimit from 'express-rate-limit';
 
 let adminApp: admin.app.App | null = null;
 
@@ -72,11 +73,97 @@ const getAI = () => {
   return new GoogleGenAI({ apiKey });
 };
 
+const invitationValidationLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { 
+    error: 'Demasiados intentos. Espera un minuto antes de volver a intentar.',
+    retryAfter: 60
+  },
+  keyGenerator: (req) => {
+    return (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || req.ip || 'unknown';
+  }
+});
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   app.use(express.json());
+
+  app.post('/api/invitations/validate', invitationValidationLimiter, async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ error: "Email requerido" });
+      }
+
+      const adminInstance = getFirebaseAdmin();
+      const firestore = adminInstance.firestore();
+      
+      const invSnap = await firestore.collection('invitations')
+        .where('email', '==', email.toLowerCase().trim())
+        .get();
+
+      if (invSnap.empty) {
+        return res.status(404).json({ error: "not_found" });
+      }
+
+      const invDoc = invSnap.docs[0];
+      const invData = { id: invDoc.id, ...invDoc.data() };
+      
+      return res.status(200).json({ invitation: invData });
+    } catch (err: any) {
+      console.error("[VALIDATE-INVITATION] Error:", err);
+      return res.status(500).json({ error: "Error interno del servidor" });
+    }
+  });
+
+  app.post('/api/invitations/activate', async (req, res) => {
+    try {
+      // NOTE: No caller verification required because anyone can activate an invitation they own, 
+      // but maybe we can just verify the user's token so they can only activate their own invitation.
+      const authHeader = req.headers.authorization;
+      if (!authHeader?.startsWith('Bearer ')) {
+        return res.status(401).json({ error: 'UNAUTHORIZED' });
+      }
+
+      const idToken = authHeader.substring(7);
+      const adminInstance = getFirebaseAdmin();
+      const decoded = await adminInstance.auth().verifyIdToken(idToken);
+
+      const { invitationId } = req.body;
+      if (!invitationId) {
+        return res.status(400).json({ error: "invitationId requerido" });
+      }
+
+      // We enforce that the invitation belongs to the authenticated user's email
+      const firestore = adminInstance.firestore();
+      const invDocRef = firestore.collection('invitations').doc(invitationId);
+      const invSnap = await invDocRef.get();
+      
+      if (!invSnap.exists) {
+        return res.status(404).json({ error: "Invitación no encontrada" });
+      }
+      
+      const invData = invSnap.data()!;
+      if (invData.email.toLowerCase() !== decoded.email?.toLowerCase()) {
+        return res.status(403).json({ error: "No puedes activar una invitación que no te pertenece" });
+      }
+
+      await invDocRef.update({
+        status: 'activated',
+        activatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      return res.status(200).json({ success: true });
+    } catch (err: any) {
+      console.error("[ACTIVATE-INVITATION] Error:", err);
+      return res.status(500).json({ error: "Error interno" });
+    }
+  });
 
   // API endpoints
   app.post("/api/admin/delete-user", async (req, res) => {
