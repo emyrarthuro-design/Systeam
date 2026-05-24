@@ -4,11 +4,14 @@ import { Diagnosis } from '../types';
 import { ShieldCheck, Target, CheckCircle2, ChevronLeft, Printer, AlertTriangle, Lightbulb, RotateCcw } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { DiagnosisReport } from '../components/DiagnosisReport';
+import { ConfirmModal } from '../components/ConfirmModal';
+import { toast } from 'react-hot-toast';
 
 export default function Results() {
   const { user } = useAuth();
   const [diagnosis, setDiagnosis] = useState<Diagnosis | null>(null);
   const [loading, setLoading] = useState(true);
+  const [confirmAction, setConfirmAction] = useState<'redo' | 'regenerate' | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -41,81 +44,100 @@ export default function Results() {
     loadData();
   }, [user]);
 
-  const handleRedoDiagnosis = async () => {
+  const handleRedoDiagnosis = () => {
+    setConfirmAction('redo');
+  };
+
+  const executeRedoDiagnosis = async () => {
+    setConfirmAction(null);
     if (!user) return;
-    if (window.confirm("¿Estás seguro de que deseas borrar este análisis por completo e iniciar de nuevo? Esta acción eliminará todas tus respuestas y no se puede deshacer.")) {
+    
+    try {
+      const { doc, deleteDoc } = await import('firebase/firestore');
+      const { db } = await import('../lib/firebase');
+      
+      console.log(`[REDO] Deleting previous diagnostic doc for user: ${user.uid}`);
       try {
-        const { doc, deleteDoc } = await import('firebase/firestore');
-        const { db } = await import('../lib/firebase');
-        
-        console.log(`[REDO] Deleting previous diagnostic doc for user: ${user.uid}`);
-        try {
-          await deleteDoc(doc(db, 'diagnostics', user.uid));
-          console.log("[REDO] Diagnostic doc deleted (or didn't exist)");
-        } catch (err) {
-          console.log('[REDO] No previous diagnostic to delete, continuing');
-        }
-
-        const newData = {
-          uid: user.uid,
-          userEmail: user.email || '',
-          userName: '',
-          answers: {},
-          progress: 0,
-          status: 'in_progress' as const,
-          createdAt: new Date().toISOString(),
-          startedAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          currentBlock: 1
-        } as Diagnosis;
-        
-        const { saveDiagnosisDebounced, updateUserDiagnosisStatus } = await import('../lib/db');
-        await saveDiagnosisDebounced(user.uid, newData);
-        await updateUserDiagnosisStatus(user.uid, 'in_progress');
-        
-        console.log('[REDO] New empty diagnostic saved');
-
-        localStorage.setItem('systeam_diagnosis', JSON.stringify(newData));
-        navigate('/bloque/1');
+        await deleteDoc(doc(db, 'diagnostics', user.uid));
+        console.log("[REDO] Diagnostic doc deleted (or didn't exist)");
       } catch (err) {
-        console.error("Error restarting diagnosis:", err);
-        alert("Hubo un error al reiniciar el diagnóstico.");
+        console.log('[REDO] No previous diagnostic to delete, continuing');
       }
+
+      const newData = {
+        uid: user.uid,
+        userEmail: user.email || '',
+        userName: '',
+        answers: {},
+        progress: 0,
+        status: 'in_progress' as const,
+        createdAt: new Date().toISOString(),
+        startedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        currentBlock: 1
+      } as Diagnosis;
+      
+      const { saveDiagnosisDebounced, updateUserDiagnosisStatus } = await import('../lib/db');
+      await saveDiagnosisDebounced(user.uid, newData);
+      await updateUserDiagnosisStatus(user.uid, 'in_progress');
+      
+      console.log('[REDO] New empty diagnostic saved');
+
+      localStorage.setItem('systeam_diagnosis', JSON.stringify(newData));
+      navigate('/bloque/1');
+    } catch (err) {
+      console.error("Error restarting diagnosis:", err);
+      toast.error("Hubo un error al reiniciar el diagnóstico.");
     }
   };
 
-  const handleRegenerateAnalysis = async () => {
+  const handleRegenerateAnalysis = () => {
+    setConfirmAction('regenerate');
+  };
+
+  const executeRegenerateAnalysis = async () => {
+    setConfirmAction(null);
     if (!user || !diagnosis) return;
-    if (window.confirm("¿Estás seguro de que deseas regenerar el análisis? Esto usará tus respuestas guardadas y creará un nuevo diagnóstico final.")) {
-      try {
-        setLoading(true);
-        const { calculateCapa1, calculateCapa2, extractTextAnswers } = await import('../lib/scoring');
-        const { generateDiagnosisReasoning } = await import('../lib/gemini');
 
-        const answersObj = diagnosis.answers || {};
-        const scores = calculateCapa1(answersObj);
-        const affinities = calculateCapa2(scores);
-        const textualAnswers = extractTextAnswers(answersObj);
+    try {
+      setLoading(true);
+      const { calculateCapa1, calculateCapa2, extractTextAnswers } = await import('../lib/scoring');
+      const { generateDiagnosisReasoning } = await import('../lib/gemini');
 
-        const aiAnalysisData = await generateDiagnosisReasoning(scores, affinities, textualAnswers);
+      const answersObj = diagnosis.answers || {};
+      const scores = calculateCapa1(answersObj);
+      const affinities = calculateCapa2(scores);
+      const textualAnswers = extractTextAnswers(answersObj);
 
-        const updatedData: Diagnosis = {
-          ...diagnosis,
-          analysis: aiAnalysisData,
-          updatedAt: new Date().toISOString()
-        };
-        
-        const { saveDiagnosisDebounced } = await import('../lib/db');
-        await saveDiagnosisDebounced(user.uid, updatedData);
-        
-        localStorage.setItem('systeam_diagnosis', JSON.stringify(updatedData));
-        setDiagnosis(updatedData);
-      } catch (err: any) {
-        console.error("Error regenerating analysis:", err);
-        alert("Hubo un error al regenerar el análisis: " + (err.message || String(err)));
-      } finally {
-        setLoading(false);
-      }
+      const aiAnalysisData = await generateDiagnosisReasoning(scores, affinities, textualAnswers);
+
+      const updatedData: Diagnosis = {
+        ...diagnosis,
+        analysis: aiAnalysisData,
+        updatedAt: new Date().toISOString()
+      };
+      
+      const { saveDiagnosisDebounced } = await import('../lib/db');
+      await saveDiagnosisDebounced(user.uid, updatedData);
+      
+      localStorage.setItem('systeam_diagnosis', JSON.stringify(updatedData));
+      setDiagnosis(updatedData);
+      toast.success('Análisis regenerado con éxito');
+    } catch (err: any) {
+      console.error("Error regenerating analysis:", err);
+      toast.error("Hubo un error al regenerar el análisis: " + (err.message || String(err)));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExportPDF = () => {
+    try {
+      window.print();
+    } catch (e) {
+      toast.error('La función de impresión no está disponible en este entorno. Abre la app en una nueva pestaña usando el botón superior derecho de AI Studio.', {
+        duration: 5000,
+      });
     }
   };
 
@@ -172,7 +194,7 @@ export default function Results() {
               <RotateCcw size={14} /> Rehacer Diagnóstico
             </button>
             <button 
-              onClick={() => window.print()} 
+              onClick={handleExportPDF} 
               className="btn-geometric-secondary text-xs flex items-center gap-2 py-2 border-slate-700 hover:border-amber-500 hover:text-amber-500"
             >
               <Printer size={16} /> Exportar PDF
@@ -198,6 +220,25 @@ export default function Results() {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={confirmAction === 'redo'}
+        title="Rehacer Diagnóstico"
+        message="¿Estás seguro de que deseas borrar este análisis por completo e iniciar de nuevo? Esta acción eliminará todas tus respuestas y no se puede deshacer."
+        confirmText="Rehacer"
+        isDestructive={true}
+        onConfirm={executeRedoDiagnosis}
+        onCancel={() => setConfirmAction(null)}
+      />
+
+      <ConfirmModal
+        isOpen={confirmAction === 'regenerate'}
+        title="Regenerar Análisis"
+        message="¿Estás seguro de que deseas regenerar el análisis? Esto usará tus respuestas guardadas y creará un nuevo diagnóstico final."
+        confirmText="Regenerar"
+        onConfirm={executeRegenerateAnalysis}
+        onCancel={() => setConfirmAction(null)}
+      />
     </div>
   );
 }

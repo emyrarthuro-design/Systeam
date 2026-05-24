@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { logActivity, deleteUserCompletely } from '../../lib/db';
 import { toast } from 'react-hot-toast';
 import { DiagnosisReport } from '../../components/DiagnosisReport';
+import { ConfirmModal } from '../../components/ConfirmModal';
 
 export default function AdminStudentDetail() {
   const { id } = useParams();
@@ -22,6 +23,7 @@ export default function AdminStudentDetail() {
   const [internalNotes, setInternalNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [confirmText, setConfirmText] = useState('');
@@ -58,39 +60,42 @@ export default function AdminStudentDetail() {
 
   const [regenerating, setRegenerating] = useState(false);
 
-  const handleRegenerateAnalysis = async () => {
+  const handleRegenerateAnalysis = () => {
+    setConfirmRegenerate(true);
+  };
+
+  const executeRegenerateAnalysis = async () => {
+    setConfirmRegenerate(false);
     if (!student || !diagnosis) return;
-    if (window.confirm("¿Estás seguro de que deseas regenerar el análisis? Esto sobreescribirá el diagnóstico actual.")) {
-      try {
-        setRegenerating(true);
-        const { calculateCapa1, calculateCapa2, extractTextAnswers } = await import('../../lib/scoring');
-        const { generateDiagnosisReasoning } = await import('../../lib/gemini');
-        
-        const answersObj = diagnosis.answers || {};
-        const scores = calculateCapa1(answersObj);
-        const affinities = calculateCapa2(scores);
-        const textualAnswers = extractTextAnswers(answersObj);
+    try {
+      setRegenerating(true);
+      const { calculateCapa1, calculateCapa2, extractTextAnswers } = await import('../../lib/scoring');
+      const { generateDiagnosisReasoning } = await import('../../lib/gemini');
+      
+      const answersObj = diagnosis.answers || {};
+      const scores = calculateCapa1(answersObj);
+      const affinities = calculateCapa2(scores);
+      const textualAnswers = extractTextAnswers(answersObj);
 
-        const aiAnalysisData = await generateDiagnosisReasoning(scores, affinities, textualAnswers);
+      const aiAnalysisData = await generateDiagnosisReasoning(scores, affinities, textualAnswers);
 
-        const updatedData = {
-          ...diagnosis,
-          analysis: aiAnalysisData,
-          updatedAt: new Date().toISOString()
-        };
-        
-        const { doc, setDoc } = await import('firebase/firestore');
-        const { db } = await import('../../lib/firebase');
-        await setDoc(doc(db, 'diagnostics', student.id), updatedData, { merge: true });
-        
-        setDiagnosis(updatedData);
-        toast.success('Análisis regenerado con éxito');
-      } catch (err: any) {
-        console.error("Error regenerating analysis:", err);
-        toast.error("Hubo un error al regenerar el análisis: " + (err.message || String(err)));
-      } finally {
-        setRegenerating(false);
-      }
+      const updatedData = {
+        ...diagnosis,
+        analysis: aiAnalysisData,
+        updatedAt: new Date().toISOString()
+      };
+      
+      const { doc, setDoc } = await import('firebase/firestore');
+      const { db } = await import('../../lib/firebase');
+      await setDoc(doc(db, 'diagnostics', student.id), updatedData, { merge: true });
+      
+      setDiagnosis(updatedData);
+      toast.success('Análisis regenerado con éxito');
+    } catch (err: any) {
+      console.error("Error regenerating analysis:", err);
+      toast.error("Hubo un error al regenerar el análisis: " + (err.message || String(err)));
+    } finally {
+      setRegenerating(false);
     }
   };
 
@@ -360,6 +365,14 @@ export default function AdminStudentDetail() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        isOpen={confirmRegenerate}
+        title="Regenerar Análisis"
+        message="¿Estás seguro de que deseas regenerar el análisis? Esto sobreescribirá el diagnóstico actual usando las respuestas guardadas."
+        confirmText="Regenerar"
+        onConfirm={executeRegenerateAnalysis}
+        onCancel={() => setConfirmRegenerate(false)}
+      />
     </div>
   );
 }
