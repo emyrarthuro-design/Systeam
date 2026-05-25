@@ -39,45 +39,52 @@ export default function DiagnosisFlow() {
     if (!user) return;
 
     const loadData = async () => {
-      // 1. Try local storage first for speed/session
-      const localData = localStorage.getItem('systeam_diagnosis');
-      if (localData) {
-        const parsedData = JSON.parse(localData) as Diagnosis;
-        
-        // MIGRACIÓN: si está completado pero no tiene análisis, es un bug
-        const hasAnalysis = parsedData.analysis?.perfil_predominante || (parsedData as any).results?.perfil_predominante || (parsedData as any).results?.profile_predominant;
-        if (parsedData.status === 'completed' && !hasAnalysis) {
-          parsedData.status = 'in_progress';
-          localStorage.setItem('systeam_diagnosis', JSON.stringify(parsedData));
-        }
-        
-        setDiagnosis(parsedData);
-        setLocalAnswers(parsedData.answers[`block_${currentBlockIndex}`] || {});
-        setLoading(false);
-        return;
-      }
-
-      // 2. Try Firestore if local is empty
       try {
         const { fetchDiagnosis: fetchDbDiag } = await import('../lib/db');
-        const dbData = await fetchDbDiag(user.uid);
-        if (dbData) {
-          let typedData = dbData as Diagnosis;
-          
-          // MIGRACIÓN: db bug fix
-          const hasAnalysisDb = typedData.analysis?.perfil_predominante || (typedData as any).results?.perfil_predominante || (typedData as any).results?.profile_predominant;
-          if (typedData.status === 'completed' && !hasAnalysisDb) {
-            typedData.status = 'in_progress';
-            const { saveDiagnosisDebounced, updateUserDiagnosisStatus } = await import('../lib/db');
-            await saveDiagnosisDebounced(user.uid, typedData);
-            await updateUserDiagnosisStatus(user.uid, 'in_progress');
+        
+        const [localDataStr, dbData] = await Promise.all([
+          Promise.resolve(localStorage.getItem('systeam_diagnosis')),
+          fetchDbDiag(user.uid).catch(err => {
+            console.error("Error fetching from DB", err);
+            return null;
+          })
+        ]);
+
+        let parsedLocal: Diagnosis | null = null;
+        if (localDataStr) {
+          try {
+            parsedLocal = JSON.parse(localDataStr) as Diagnosis;
+          } catch (e) {
+            console.error("Error parsing local data", e);
+          }
+        }
+
+        let parsedDb = dbData as Diagnosis | null;
+        let winner: Diagnosis | null = null;
+
+        if (parsedLocal && parsedDb) {
+          const localTime = new Date(parsedLocal.updatedAt || 0).getTime();
+          const dbTime = new Date(parsedDb.updatedAt || 0).getTime();
+          winner = localTime >= dbTime ? parsedLocal : parsedDb;
+        } else {
+          winner = parsedLocal || parsedDb;
+        }
+
+        if (winner) {
+          const hasAnalysis = winner.analysis?.perfil_predominante || (winner as any).results?.perfil_predominante || (winner as any).results?.profile_predominant;
+          if (winner.status === 'completed' && !hasAnalysis) {
+            winner.status = 'in_progress';
+            if (winner === parsedDb) {
+              const { saveDiagnosisDebounced, updateUserDiagnosisStatus } = await import('../lib/db');
+              await saveDiagnosisDebounced(user.uid, winner);
+              await updateUserDiagnosisStatus(user.uid, 'in_progress');
+            }
           }
           
-          setDiagnosis(typedData);
-          setLocalAnswers(typedData.answers[`block_${currentBlockIndex}`] || {});
-          localStorage.setItem('systeam_diagnosis', JSON.stringify(typedData));
+          setDiagnosis(winner);
+          setLocalAnswers(winner.answers[`block_${currentBlockIndex}`] || {});
+          localStorage.setItem('systeam_diagnosis', JSON.stringify(winner));
         } else {
-          // 3. Initialize if not found anywhere (fallback)
           const newDiag: Diagnosis = {
             uid: user.uid,
             userEmail: profile?.email || user.email || '',
@@ -94,7 +101,7 @@ export default function DiagnosisFlow() {
           localStorage.setItem('systeam_diagnosis', JSON.stringify(newDiag));
         }
       } catch (err) {
-        console.error("Error fetching from DB", err);
+        console.error("Error loading data", err);
       }
       setLoading(false);
     };

@@ -10,8 +10,18 @@ export function calculateCapa1(answers: Record<string, any>) {
   // Helper to extract text points loosely (defaults to 3 prior to AI processing)
   const getQualitativeScore = (val: any) => {
     if (!val || typeof val !== 'string' || val.trim().length === 0) return 1;
-    if (val.trim().length < 10) return 2;
-    return 3;
+    const len = val.trim().length;
+    if (len < 10) return 1;
+    if (len < 50) return 2;
+    if (len < 150) return 3;
+    if (len < 300) return 4;
+    return 5;
+  };
+
+  const getMultiTextScore = (keys: string[]) => {
+    if (keys.length === 0) return 1;
+    const total = keys.reduce((sum, key) => sum + getQualitativeScore(flatAnswers[key]), 0);
+    return total / keys.length;
   };
 
   // AE (Autoridad y Experiencia)
@@ -36,8 +46,7 @@ export function calculateCapa1(answers: Record<string, any>) {
   else if (b1_p4 === "Vivo de esto") ae += 5 * 0.30;
   else ae += 1 * 0.30;
 
-  ae += 3 * 0.25; // Frase representativa (evaluada por IA)
-
+  ae += getQualitativeScore(flatAnswers["b1_p3_exp"]) * 0.25;
 
   // SE (Seguridad para Exponerse)
   let se = 0;
@@ -52,7 +61,7 @@ export function calculateCapa1(answers: Record<string, any>) {
   se += b2ScaleAvg * 0.50;
   
   // Análisis IA carga emocional B2 Parte A
-  se += 3 * 0.25; 
+  se += getMultiTextScore(["b2_p1", "b2_p2"]) * 0.25; 
   
   const b3_p4 = Array.isArray(flatAnswers["b3_p4"]) ? flatAnswers["b3_p4"].length : (flatAnswers["b3_p4"] ? 1 : 0);
   if (b3_p4 === 0) se += 5 * 0.25;
@@ -63,31 +72,31 @@ export function calculateCapa1(answers: Record<string, any>) {
 
   // CI (Claridad de Identidad)
   let ci = (
-    3 * 0.35 +  // P1-P2
-    3 * 0.25 +  // P3-P4
-    3 * 0.20 +  // P5
-    3 * 0.20    // ej1-ej4
+    getMultiTextScore(["b4_p1", "b4_p2"]) * 0.35 +
+    getMultiTextScore(["b4_p3", "b4_p4"]) * 0.25 +
+    getQualitativeScore(flatAnswers["b4_p5"]) * 0.20 +
+    getMultiTextScore(["b4_ej1", "b4_ej2", "b4_ej3", "b4_ej4"]) * 0.20
   );
 
   // CA (Claridad de Avatar)
   let ca = (
-    3 * 0.25 +  // P1
-    3 * 0.25 +  // P2
-    3 * 0.20 +  // P3
-    3 * 0.30    // P4-P5
+    getQualitativeScore(flatAnswers["b5_p1"]) * 0.25 +
+    getQualitativeScore(flatAnswers["b5_p2"]) * 0.25 +
+    getMultiTextScore(["b5_p3_1", "b5_p3_2"]) * 0.20 +
+    getMultiTextScore(["b5_p4", "b5_p5"]) * 0.30
   );
 
   // CO (Claridad de Oferta)
   let co = 0;
   const b6_gate = flatAnswers["b6_gate"];
   if (b6_gate === "No") {
-    co = 2.5; // Max teorico es 3, arrancamos base 2.5
+    co = Math.min(3.0, getMultiTextScore(["b6_b_p1_1", "b6_b_p1_2", "b6_b_p2_1", "b6_b_p2_2"]) * 0.6);
   } else {
     co = (
-      3 * 0.50 +  // nombre, prob, trans
-      3 * 0.20 +  // incl/precio
-      3 * 0.15 +  // diff
-      3 * 0.15    // ej
+      getMultiTextScore(["b6_a_p1_1", "b6_a_p1_2", "b6_a_p2_1"]) * 0.50 +
+      getMultiTextScore(["b6_a_p3_1", "b6_a_p3_2"]) * 0.20 +
+      getQualitativeScore(flatAnswers["b6_a_p4"]) * 0.15 +
+      getMultiTextScore(["b6_ej1", "b6_ej2", "b6_ej3", "b6_ej4", "b6_ej5"]) * 0.15
     );
   }
 
@@ -107,13 +116,13 @@ export function calculateCapa1(answers: Record<string, any>) {
   else if (b7_p3 === "Lleva a una oferta concreta") cc += 5 * 0.30;
   else cc += 1 * 0.30;
 
-  cc += 3 * 0.15; // Cuesta comunicar
-  cc += 3 * 0.20; // Frase posicionamiento
-  cc += 3 * 0.15; // 3 ideas (ej1-ej3)
+  cc += getQualitativeScore(flatAnswers["b7_p4"]) * 0.15; // Cuesta comunicar
+  cc += getQualitativeScore(flatAnswers["b7_p5"]) * 0.20; // Frase posicionamiento
+  cc += getMultiTextScore(["b7_ej1", "b7_ej2", "b7_ej3"]) * 0.15; // 3 ideas (ej1-ej3)
 
   // SV (Sistema de Ventas)
   let sv = 0;
-  sv += 3 * 0.35; // Proceso repetible infiere IA
+  sv += getQualitativeScore(flatAnswers["b6_a_p3_1"]) * 0.35; // Proceso repetible infiere IA
   
   if (b7_p3 === "Lleva a una oferta concreta") sv += 5 * 0.35;
   else if (b7_p3 === "A veces lleva a oferta") sv += 3 * 0.35;
@@ -130,7 +139,7 @@ export function calculateCapa1(answers: Record<string, any>) {
 
   // ES (Entorno y Sostén)
   let es = 0;
-  es += 3 * 0.30; // Entorno (P1)
+  es += getMultiTextScore(["b8_p1_1", "b8_p1_2"]) * 0.30; // Entorno (P1)
   
   const b8_p2 = flatAnswers["b8_p2"];
   if (b8_p2 === "Sí, ambos") es += 5 * 0.25;
@@ -138,8 +147,8 @@ export function calculateCapa1(answers: Record<string, any>) {
   else if (b8_p2 === "No tengo ninguno") es += 1 * 0.25;
   else es += 3 * 0.25;
 
-  es += 3 * 0.25; // Hábitos (P3)
-  es += 3 * 0.20; // Soltar (P4)
+  es += getMultiTextScore(["b8_p3_1", "b8_p3_2"]) * 0.25; // Hábitos (P3)
+  es += getQualitativeScore(flatAnswers["b8_p4"]) * 0.20; // Soltar (P4)
 
   return {
     AE: Number(ae.toFixed(2)),
