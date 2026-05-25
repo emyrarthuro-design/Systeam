@@ -576,7 +576,7 @@ export default function AdminInvitations() {
                       <button 
                         onClick={() => {
                           navigator.clipboard.writeText(`${APP_PUBLIC_URL}/activar`);
-                          alert('Link copiado al portapapeles');
+                          toast.success('Link copiado al portapapeles');
                         }}
                         className="flex items-center justify-center gap-2 py-4 px-4 rounded-sm font-black uppercase tracking-tighter text-[10px] transition-colors bg-sys-input border border-sys-border hover:bg-sys-border text-sys-text-main"
                       >

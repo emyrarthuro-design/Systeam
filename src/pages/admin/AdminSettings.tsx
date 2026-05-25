@@ -12,6 +12,7 @@ export default function AdminSettings() {
 
   const [loadingClean, setLoadingClean] = useState(false);
   const [messageClean, setMessageClean] = useState('');
+  const [confirmClean, setConfirmClean] = useState(false);
 
   const handleExportDiagnosticsCSV = async () => {
     setLoadingCsv(true);
@@ -80,8 +81,6 @@ export default function AdminSettings() {
   };
 
   const handleCleanTestData = async () => {
-    if (!window.confirm("¿Seguro que deseas eliminar todos los datos de prueba? Esto incluye cuentas con @systeam.com")) return;
-    
     setLoadingClean(true);
     setMessageClean('');
     try {
@@ -192,13 +191,38 @@ export default function AdminSettings() {
         <p className="text-sm text-sys-text-sec mb-6">
           Elimina todos los registros de invitaciones de prueba, usuarios y diagnósticos cuyo correo termine en @systeam.com.
         </p>
-        <button 
-          onClick={handleCleanTestData}
-          disabled={loadingClean}
-          className="px-6 py-3 font-bold text-xs uppercase tracking-widest bg-rose-500 hover:bg-rose-600 text-white transition-colors rounded-sm shadow-lg shadow-rose-500/20 disabled:opacity-50"
-        >
-          {loadingClean ? 'Limpiando...' : 'Limpiar datos de prueba'}
-        </button>
+        {!confirmClean ? (
+          <button 
+            onClick={() => setConfirmClean(true)}
+            disabled={loadingClean}
+            className="px-6 py-3 font-bold text-xs uppercase tracking-widest bg-rose-500 hover:bg-rose-600 text-white transition-colors rounded-sm shadow-lg shadow-rose-500/20 disabled:opacity-50"
+          >
+            {loadingClean ? 'Limpiando...' : 'Limpiar datos de prueba'}
+          </button>
+        ) : (
+          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded mb-4">
+            <p className="text-sm text-red-400 font-bold mb-4">¿Seguro que deseas eliminar todos los datos de prueba? Esto incluye cuentas con @systeam.com</p>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => {
+                  setConfirmClean(false);
+                  handleCleanTestData();
+                }}
+                disabled={loadingClean}
+                className="px-6 py-2 bg-red-500 text-white rounded text-xs font-bold uppercase disabled:opacity-50"
+              >
+                Sí, eliminar todo
+              </button>
+              <button 
+                onClick={() => setConfirmClean(false)}
+                disabled={loadingClean}
+                className="px-6 py-2 bg-sys-input text-white border border-sys-border rounded text-xs font-bold uppercase transition-colors hover:bg-sys-border disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
         {messageClean && (
           <p className="mt-4 text-sm text-sys-accent">{messageClean}</p>
         )}

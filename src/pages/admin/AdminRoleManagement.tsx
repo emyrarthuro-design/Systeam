@@ -16,6 +16,10 @@ export default function AdminRoleManagement() {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
+  // Inline confirmation states
+  const [pendingRoleChange, setPendingRoleChange] = useState<{email: string, role: string} | null>(null);
+  const [pendingPromotion, setPendingPromotion] = useState<string | null>(null);
+
   // Create Admin form
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
@@ -48,14 +52,7 @@ export default function AdminRoleManagement() {
     }
   }, [activeTab, isSuperAdmin]);
 
-  const handleRoleChange = async (userId: string, targetEmail: string, newRole: UserRole) => {
-    if (checkSuperAdmin(targetEmail)) {
-      toast.error('No se puede cambiar el rol del Super Admin principal.');
-      return;
-    }
-
-    if (!window.confirm(`¿Seguro que deseas cambiar el rol de ${targetEmail} a ${newRole}?`)) return;
-
+  const executeRoleChange = async (userId: string, targetEmail: string, newRole: string) => {
     try {
       await updateDoc(doc(db, 'users', userId), { role: newRole });
       await logActivity({
@@ -71,7 +68,18 @@ export default function AdminRoleManagement() {
     } catch (error) {
       if (import.meta.env.DEV) console.error(error);
       toast.error('Error al actualizar rol');
+    } finally {
+      setPendingRoleChange(null);
     }
+  };
+
+  const handleRoleChange = async (userId: string, targetEmail: string, newRole: UserRole) => {
+    if (checkSuperAdmin(targetEmail)) {
+      toast.error('No se puede cambiar el rol del Super Admin principal.');
+      return;
+    }
+
+    setPendingRoleChange({ email: targetEmail, role: newRole });
   };
 
   const handleDeleteAdmin = async (userId: string, targetEmail: string) => {
@@ -108,6 +116,38 @@ export default function AdminRoleManagement() {
     }
   };
 
+  const executePromotion = async (emailToPromote: string) => {
+    setIsSubmitting(true);
+    try {
+      const userQ = query(collection(db, 'users'), where('email', '==', emailToPromote));
+      const userSnap = await (await import('firebase/firestore')).getDocs(userQ);
+      if (!userSnap.empty) {
+        const userDoc = userSnap.docs[0];
+        const userData = userDoc.data();
+        await updateDoc(doc(db, 'users', userDoc.id), { role: 'admin' });
+        await logActivity({
+          action: 'change_role',
+          executorId: currentAdmin?.uid || 'unknown',
+          executorName: currentAdmin?.fullName || 'Super Admin',
+          executorEmail: currentAdmin?.email || '',
+          targetId: userDoc.id,
+          targetEmail: emailToPromote,
+          details: { newRole: 'admin', previousRole: userData.role }
+        });
+        toast.success('Usuario promovido a Administrador');
+        setActiveTab('admins');
+      }
+    } catch (error) {
+      if (import.meta.env.DEV) console.error(error);
+      toast.error('Error al promover usuario');
+    } finally {
+      setIsSubmitting(false);
+      setPendingPromotion(null);
+      setEmail('');
+      setFullName('');
+    }
+  };
+
   const handleCreateAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -127,20 +167,9 @@ export default function AdminRoleManagement() {
           return;
         }
 
-        if (window.confirm(`${normalizedEmail} ya existe como alumno. ¿Promover a Administrador?`)) {
-          await updateDoc(doc(db, 'users', userDoc.id), { role: 'admin' });
-          await logActivity({
-            action: 'change_role',
-            executorId: currentAdmin?.uid || 'unknown',
-            executorName: currentAdmin?.fullName || 'Super Admin',
-            executorEmail: currentAdmin?.email || '',
-            targetId: userDoc.id,
-            targetEmail: normalizedEmail,
-            details: { newRole: 'admin', previousRole: userData.role }
-          });
-          toast.success('Usuario promovido a Administrador');
-          setActiveTab('admins');
-        }
+        setPendingPromotion(normalizedEmail);
+        setIsSubmitting(false);
+        return;
       } else {
         // Create invitation with admin flag
         const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -264,22 +293,32 @@ export default function AdminRoleManagement() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       {!checkSuperAdmin(admin.email) && admin.uid !== currentAdmin?.uid ? (
-                        <div className="flex items-center justify-end gap-2">
-                          <button 
-                            onClick={() => handleRoleChange(admin.uid, admin.email, admin.role === 'admin' ? 'student' : 'admin')}
-                            className="p-2 text-sys-text-mut hover:text-sys-accent hover:bg-sys-accent-alpha rounded-sm transition-all"
-                            title="Degradar a alumno"
-                          >
-                            <ArrowDown size={16} />
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteAdmin(admin.uid, admin.email)}
-                            className="p-2 text-sys-text-mut hover:text-sys-error hover:bg-sys-error/10 rounded-sm transition-all"
-                            title="Eliminar administrador"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
+                        pendingRoleChange?.email === admin.email ? (
+                          <div className="flex flex-col items-end gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded">
+                            <span className="text-xs text-red-400 font-bold">¿Cambiar a {pendingRoleChange.role}?</span>
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => executeRoleChange(admin.uid, pendingRoleChange.email, pendingRoleChange.role)} className="px-3 py-1 bg-red-500 text-white rounded text-[10px] font-bold uppercase hover:bg-red-600 transition-colors">Confirmar</button>
+                              <button onClick={() => setPendingRoleChange(null)} className="px-3 py-1 bg-sys-input text-white border border-sys-border rounded text-[10px] font-bold uppercase hover:bg-sys-border transition-colors">Cancelar</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-end gap-2">
+                            <button 
+                              onClick={() => handleRoleChange(admin.uid, admin.email, admin.role === 'admin' ? 'student' : 'admin')}
+                              className="p-2 text-sys-text-mut hover:text-sys-accent hover:bg-sys-accent-alpha rounded-sm transition-all"
+                              title="Degradar a alumno"
+                            >
+                              <ArrowDown size={16} />
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteAdmin(admin.uid, admin.email)}
+                              className="p-2 text-sys-text-mut hover:text-sys-error hover:bg-sys-error/10 rounded-sm transition-all"
+                              title="Eliminar administrador"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        )
                       ) : (
                         <span className="text-[10px] text-sys-text-mut uppercase font-bold px-2 italic">Protegido</span>
                       )}
@@ -321,17 +360,41 @@ export default function AdminRoleManagement() {
                 <div className="p-4 bg-sys-accent-alpha border border-sys-accent/20 rounded-sm text-xs text-sys-text-sec leading-relaxed">
                   <p>Si el email ya existe como alumno, se le asignará el rol de administrador. Si es nuevo, se generará una invitación especial que le otorgará permisos de administrador al activarse.</p>
                 </div>
-                <button 
-                  disabled={isSubmitting} 
-                  type="submit" 
-                  className="w-full btn-geometric-primary py-4 font-black uppercase tracking-widest flex items-center justify-center gap-2"
-                >
-                  {isSubmitting ? 'Procesando...' : (
-                    <>
-                      <UserPlus size={18} /> Crear Administrador
-                    </>
-                  )}
-                </button>
+                {!pendingPromotion ? (
+                  <button 
+                    disabled={isSubmitting} 
+                    type="submit" 
+                    className="w-full btn-geometric-primary py-4 font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                  >
+                    {isSubmitting ? 'Procesando...' : (
+                      <>
+                        <UserPlus size={18} /> Crear Administrador
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded mb-4">
+                    <p className="text-sm text-red-400 font-bold mb-4">{pendingPromotion} ya existe como alumno. ¿Seguro que deseas promoverlo a Administrador?</p>
+                    <div className="flex items-center gap-3">
+                      <button 
+                        type="button"
+                        onClick={() => executePromotion(pendingPromotion)}
+                        disabled={isSubmitting}
+                        className="px-6 py-2 bg-red-500 text-white rounded text-xs font-bold uppercase disabled:opacity-50"
+                      >
+                        {isSubmitting ? 'Procesando...' : 'Sí, Promover'}
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => { setPendingPromotion(null); setIsSubmitting(false); }}
+                        disabled={isSubmitting}
+                        className="px-6 py-2 bg-sys-input text-white border border-sys-border rounded text-xs font-bold uppercase transition-colors hover:bg-sys-border disabled:opacity-50"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
               </form>
             </div>
           </div>
