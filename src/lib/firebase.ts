@@ -49,6 +49,6 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path
   }
   const errorMessage = JSON.stringify(errInfo);
-  console.error('Firestore Error: ', errorMessage);
+  if (import.meta.env.DEV) console.error('Firestore Error: ', errorMessage);
   throw new Error(errorMessage);
 }

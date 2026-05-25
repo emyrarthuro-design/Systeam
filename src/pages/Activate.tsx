@@ -76,7 +76,7 @@ export default function Activate() {
       setStep(3); // Password form
       
     } catch (err) {
-      console.error(err);
+      if (import.meta.env.DEV) console.error(err);
       setErrorType('not_found');
       setStep(2);
     } finally {
@@ -126,9 +126,8 @@ export default function Activate() {
         if (!response.ok) {
           throw new Error('API returned an error');
         }
-        console.log('[ACTIVATE] Invitation marked as used via API:', invitation.id);
       } catch (err) {
-        console.error('[ACTIVATE] Failed to mark invitation as used:', 
+        if (import.meta.env.DEV) console.error('[ACTIVATE] Failed to mark invitation as used:', 
           { invitationId: invitation.id, error: err });
       }
 
@@ -140,10 +139,8 @@ export default function Activate() {
       }, 2000);
       
     } catch (err: any) {
-      console.error(err);
+      if (import.meta.env.DEV) console.error(err);
       if (err.code === 'auth/email-already-in-use') {
-        console.log('[ACTIVATE-RECOVER] Detected existing auth account for email:', 
-                    invitation.email, '- routing to recovery flow');
         setStep(5);
         setCreating(false);
         return;
@@ -175,10 +172,8 @@ export default function Activate() {
         return;
       }
 
-      console.log('[ACTIVATE-RECOVER] User signed in successfully, recreating profile');
 
       await createOrUpdateStudentProfile(user, invitation);
-      console.log('[ACTIVATE-RECOVER] Profile created/merged:', user.uid);
 
       try {
         const idToken = await user.getIdToken();
@@ -196,12 +191,10 @@ export default function Activate() {
         }
         
         if (invitation.status === 'activated') {
-          console.log('[ACTIVATE-RECOVER] Invitation already activated, re-marking for audit');
         } else {
-          console.log('[ACTIVATE] Invitation marked as used via API:', invitation.id);
         }
       } catch (err) {
-        console.error('[ACTIVATE] Failed to mark invitation as used:', { invitationId: invitation.id, error: err });
+        if (import.meta.env.DEV) console.error('[ACTIVATE] Failed to mark invitation as used:', { invitationId: invitation.id, error: err });
       }
 
       setStep(4);
@@ -210,7 +203,7 @@ export default function Activate() {
       }, 2000);
 
     } catch (err: any) {
-      console.error('[ACTIVATE-RECOVER] Failed to sign in:', err);
+      if (import.meta.env.DEV) console.error('[ACTIVATE-RECOVER] Failed to sign in:', err);
       if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
         setGlobalError('Contraseña incorrecta. Intenta nuevamente.');
       } else {
@@ -226,7 +219,7 @@ export default function Activate() {
       await sendPasswordResetEmail(auth, invitation.email);
       setResetSent(true);
     } catch (err) {
-      console.error(err);
+      if (import.meta.env.DEV) console.error(err);
     }
   };
 

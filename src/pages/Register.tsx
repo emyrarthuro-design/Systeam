@@ -57,7 +57,7 @@ export default function Register() {
           setErrorType('none');
         }
       } catch (err) {
-        console.error(err);
+        if (import.meta.env.DEV) console.error(err);
         setGlobalError('Error al verificar el código.');
         setErrorType('invalid');
       } finally {
@@ -120,7 +120,7 @@ export default function Register() {
       }, 2000);
       
     } catch (err: any) {
-      console.error(err);
+      if (import.meta.env.DEV) console.error(err);
       if (err.code === 'auth/email-already-in-use') {
         setGlobalError('Este email ya tiene una cuenta. Intenta iniciar sesión.');
       } else if (err.code === 'auth/weak-password') {

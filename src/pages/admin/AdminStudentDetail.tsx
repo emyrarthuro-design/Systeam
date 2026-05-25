@@ -51,7 +51,7 @@ export default function AdminStudentDetail() {
           setDiagnosis(dSnap.data());
         }
       } catch(err) {
-        console.error(err);
+        if (import.meta.env.DEV) console.error(err);
       }
       setLoading(false);
     }
@@ -92,7 +92,7 @@ export default function AdminStudentDetail() {
       setDiagnosis(updatedData);
       toast.success('Análisis regenerado con éxito');
     } catch (err: any) {
-      console.error("Error regenerating analysis:", err);
+      if (import.meta.env.DEV) console.error("Error regenerating analysis:", err);
       toast.error("Hubo un error al regenerar el análisis: " + (err.message || String(err)));
     } finally {
       setRegenerating(false);
@@ -115,7 +115,7 @@ export default function AdminStudentDetail() {
       setTimeout(() => setSaveSuccess(false), 3000);
       toast.success('Notas guardadas');
     } catch(err) {
-      console.error("Error saving notes:", err);
+      if (import.meta.env.DEV) console.error("Error saving notes:", err);
       toast.error('Error al guardar notas');
     }
     setSavingNotes(false);
@@ -145,7 +145,7 @@ export default function AdminStudentDetail() {
         setDeleteError(response.error || 'Error desconocido');
       }
     } catch (error: any) {
-      console.error(error);
+      if (import.meta.env.DEV) console.error(error);
       setDeleteError(error.message || 'Error al comunicarse con el servidor');
     } finally {
       setDeleting(false);
@@ -256,26 +256,115 @@ export default function AdminStudentDetail() {
               {!isAdmin ? (
                 <p className="text-sm text-sys-text-mut">No tienes permisos para ver las notas internas.</p>
               ) : (
-                <div className="space-y-4">
-                  <p className="text-sm text-sys-text-mut">Añade observaciones, comentarios de reuniones o información relevante de este alumno.</p>
+                <div className="space-y-8">
+                  {/* AI Internal Notes */}
+                  <div className="space-y-6">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-sys-accent mb-2">
+                       Nota Interna de IA
+                    </h3>
+                    
+                    {diagnosis?.analysis?.nota_interna ? (
+                      <div className="space-y-6">
+                        {diagnosis.analysis.nota_interna.observaciones_crudas && (
+                          <div>
+                             <h4 className="text-xs font-bold text-sys-text-sec uppercase mb-1">Observaciones crudas</h4>
+                             <p className="text-sm text-sys-text-main whitespace-pre-wrap">{diagnosis.analysis.nota_interna.observaciones_crudas}</p>
+                          </div>
+                        )}
+                        
+                        {diagnosis.analysis.nota_interna.banderas_rojas && Array.isArray(diagnosis.analysis.nota_interna.banderas_rojas) && diagnosis.analysis.nota_interna.banderas_rojas.length > 0 && (
+                          <div>
+                             <h4 className="text-xs font-bold text-sys-text-sec uppercase mb-1">Banderas rojas</h4>
+                             <ul className="space-y-2 mt-2">
+                               {diagnosis.analysis.nota_interna.banderas_rojas.map((flag: string, i: number) => (
+                                 <li key={i} className="flex items-start gap-2 text-sm text-red-400">
+                                   <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                                   <span>{flag}</span>
+                                 </li>
+                               ))}
+                             </ul>
+                          </div>
+                        )}
+                        
+                        {diagnosis.analysis.nota_interna.contradicciones_detectadas && Array.isArray(diagnosis.analysis.nota_interna.contradicciones_detectadas) && diagnosis.analysis.nota_interna.contradicciones_detectadas.length > 0 && (
+                          <div>
+                             <h4 className="text-xs font-bold text-sys-text-sec uppercase mb-1">Contradicciones detectadas</h4>
+                             <ul className="space-y-1 list-disc pl-4 text-sm text-sys-text-main">
+                               {diagnosis.analysis.nota_interna.contradicciones_detectadas.map((item: string, i: number) => (
+                                 <li key={i}>{item}</li>
+                               ))}
+                             </ul>
+                          </div>
+                        )}
+                        
+                        {diagnosis.analysis.nota_interna.nivel_honestidad_percibida && (
+                          <div>
+                             <h4 className="text-xs font-bold text-sys-text-sec uppercase mb-1">Nivel de honestidad percibida</h4>
+                             <p className="text-sm text-sys-text-main">{diagnosis.analysis.nota_interna.nivel_honestidad_percibida}</p>
+                          </div>
+                        )}
+                        
+                        {diagnosis.analysis.nota_interna.urgencia_intervencion && (
+                          <div>
+                             <h4 className="text-xs font-bold text-sys-text-sec uppercase mb-1">Urgencia de intervención</h4>
+                             <div className={`inline-block px-3 py-1 text-sm rounded ${String(diagnosis.analysis.nota_interna.urgencia_intervencion).toLowerCase().includes('alta') ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-sys-input border border-sys-border text-sys-text-main'}`}>
+                                {diagnosis.analysis.nota_interna.urgencia_intervencion}
+                             </div>
+                          </div>
+                        )}
+                        
+                        {diagnosis.analysis.nota_interna.enfoque_mentoria_primera_sesion && (
+                          <div>
+                             <h4 className="text-xs font-bold text-sys-text-sec uppercase mb-1">Enfoque primera sesión</h4>
+                             <p className="text-sm text-sys-text-main whitespace-pre-wrap">{diagnosis.analysis.nota_interna.enfoque_mentoria_primera_sesion}</p>
+                          </div>
+                        )}
+                        
+                        {diagnosis.analysis.nota_interna.preguntas_para_indagar && Array.isArray(diagnosis.analysis.nota_interna.preguntas_para_indagar) && diagnosis.analysis.nota_interna.preguntas_para_indagar.length > 0 && (
+                          <div>
+                             <h4 className="text-xs font-bold text-sys-text-sec uppercase mb-1">Preguntas para indagar</h4>
+                             <ol className="space-y-1 list-decimal pl-4 text-sm text-sys-text-main">
+                               {diagnosis.analysis.nota_interna.preguntas_para_indagar.map((item: string, i: number) => (
+                                 <li key={i}>{item}</li>
+                               ))}
+                             </ol>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-sys-text-mut italic bg-sys-input/50 p-4 rounded border border-sys-border">
+                        El análisis de IA no generó nota interna para este alumno.
+                      </p>
+                    )}
+                  </div>
                   
-                  <textarea 
-                    value={internalNotes}
-                    onChange={(e) => setInternalNotes(e.target.value)}
-                    className="w-full bg-sys-input/50 border border-sys-border rounded p-4 text-sys-text-main h-64 focus:outline-none focus:border-sys-accent transition-colors"
-                    placeholder="Escribe notas internas aquí..."
-                  />
-                  
-                  <div className="flex justify-end items-center gap-4">
-                    {saveSuccess && <span className="text-sm text-green-500 font-bold">¡Notas guardadas!</span>}
-                    <button 
-                      onClick={handleSaveNotes}
-                      disabled={savingNotes}
-                      className="btn-primary flex items-center gap-2"
-                    >
-                      {savingNotes ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                      {savingNotes ? 'Guardando...' : 'Guardar Notas'}
-                    </button>
+                  <div className="h-px w-full bg-sys-border my-6"></div>
+
+                  {/* Mentor Notes */}
+                  <div>
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-sys-accent mb-2">
+                       Notas del Mentor
+                    </h3>
+                    <p className="text-sm text-sys-text-mut mb-4">Añade observaciones, comentarios de reuniones o información relevante de este alumno.</p>
+                    
+                    <textarea 
+                      value={internalNotes}
+                      onChange={(e) => setInternalNotes(e.target.value)}
+                      className="w-full bg-sys-input/50 border border-sys-border rounded p-4 text-sys-text-main h-64 focus:outline-none focus:border-sys-accent transition-colors"
+                      placeholder="Escribe notas internas aquí..."
+                    />
+                    
+                    <div className="flex justify-end items-center gap-4 mt-4">
+                      {saveSuccess && <span className="text-sm text-green-500 font-bold">¡Notas guardadas!</span>}
+                      <button 
+                        onClick={handleSaveNotes}
+                        disabled={savingNotes}
+                        className="btn-primary flex items-center gap-2"
+                      >
+                        {savingNotes ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                        {savingNotes ? 'Guardando...' : 'Guardar Notas'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

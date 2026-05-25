@@ -43,7 +43,6 @@ export default function Login() {
         }
       } catch (signInErr: any) {
         if (SUPER_ADMIN_EMAILS.includes(cleanEmail.toLowerCase()) && (signInErr.code === 'auth/invalid-credential' || signInErr.code === 'auth/user-not-found')) {
-          console.log('Creating admin account automatically...');
           isCreatingAdmin = true;
           const { createUserWithEmailAndPassword } = await import('firebase/auth');
           const { doc, setDoc } = await import('firebase/firestore');
@@ -67,7 +66,7 @@ export default function Login() {
          setTimeout(() => navigate('/diagnostico'), 500);
       }
     } catch (err: any) {
-      console.error(err);
+      if (import.meta.env.DEV) console.error(err);
       
       // Auto-bootstrap admin account if it doesn't exist
       if (cleanEmail === 'info@emyrarthuro.com' && password === 'Admin2026!' && err.code === 'auth/invalid-credential') {
@@ -90,7 +89,7 @@ export default function Login() {
           setTimeout(() => navigate('/admin'), 500);
           return;
         } catch (bootstrapErr: any) {
-          console.error("Failed to bootstrap admin:", bootstrapErr);
+          if (import.meta.env.DEV) console.error("Failed to bootstrap admin:", bootstrapErr);
           if (bootstrapErr.code === 'auth/email-already-in-use') {
              setError('La cuenta admin ya existe en Firebase pero con otra contraseña (o método de inicio). Usa "¿Olvidaste tu contraseña?" o elimínala en Firebase Console.');
              setLoading(false);
@@ -127,7 +126,7 @@ export default function Login() {
       await sendPasswordResetEmail(auth, email);
       setResetSent(true);
     } catch (err: any) {
-      console.error(err);
+      if (import.meta.env.DEV) console.error(err);
       setError('Ocurrió un error al enviar el email. Verifica tu dirección.');
     } finally {
       setLoading(false);

@@ -64,7 +64,7 @@ export async function logActivity(log: Omit<ActivityLog, 'id' | 'timestamp'>) {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error("Error logging activity:", error);
+    if (import.meta.env.DEV) console.error("Error logging activity:", error);
     // Optional: handleFirestoreError(error, OperationType.WRITE, path);
   }
 }

@@ -118,7 +118,7 @@ export default function AdminStudents() {
         setDeleteError(response.error || 'Error desconocido');
       }
     } catch (error: any) {
-      console.error(error);
+      if (import.meta.env.DEV) console.error(error);
       setDeleteError(error.message || 'Error al comunicarse con el servidor');
     } finally {
       setDeleting(false);

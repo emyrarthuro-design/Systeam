@@ -70,7 +70,6 @@ export const useSpeechToText = ({ onResult, lang = 'es-419' }: UseSpeechToTextPr
     };
 
     recognition.onerror = (event: any) => {
-      console.log('Speech error:', event.error);
       
       const restartableErrors = ['no-speech', 'audio-capture', 'network'];
       
@@ -119,7 +118,7 @@ export const useSpeechToText = ({ onResult, lang = 'es-419' }: UseSpeechToTextPr
     try {
       recognition.start();
     } catch (e) {
-      console.error('Failed to start recognition:', e);
+      if (import.meta.env.DEV) console.error('Failed to start recognition:', e);
       setError('start-failed');
       cleanup();
     }

@@ -69,7 +69,7 @@ export default function AdminRoleManagement() {
       });
       toast.success(`Rol actualizado a ${newRole}`);
     } catch (error) {
-      console.error(error);
+      if (import.meta.env.DEV) console.error(error);
       toast.error('Error al actualizar rol');
     }
   };
@@ -103,7 +103,7 @@ export default function AdminRoleManagement() {
       });
       toast.success('Cuenta de administrador eliminada');
     } catch (error) {
-      console.error(error);
+      if (import.meta.env.DEV) console.error(error);
       toast.error('Error al eliminar cuenta');
     }
   };
@@ -176,7 +176,7 @@ export default function AdminRoleManagement() {
         setActiveTab('admins');
       }
     } catch (error) {
-      console.error(error);
+      if (import.meta.env.DEV) console.error(error);
       toast.error('Error al procesar solicitud');
     } finally {
       setIsSubmitting(false);

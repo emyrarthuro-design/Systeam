@@ -84,7 +84,7 @@ export default function AdminDashboard() {
         });
         setRecent(recentList.slice(0, 5));
       } catch (err: any) {
-        console.error("Error in AdminDashboard loadData:", err);
+        if (import.meta.env.DEV) console.error("Error in AdminDashboard loadData:", err);
       }
     }
     loadData();
@@ -100,7 +100,7 @@ export default function AdminDashboard() {
       setUnsentInvites(prev => prev.filter(i => i.id !== id));
       setStats(prev => ({...prev, pendingInvites: prev.pendingInvites}));
     } catch (error) {
-      console.error(error);
+      if (import.meta.env.DEV) console.error(error);
     }
   };
 

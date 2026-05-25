@@ -89,7 +89,7 @@ export function DictationTextarea({ value, onChange, placeholder, className, cou
       setToastMessage("Texto mejorado. Puedes seguir editando manualmente.");
       setTimeout(() => setToastMessage(null), 5000);
     } catch (error) {
-      console.error("Error mejorando texto", error);
+      if (import.meta.env.DEV) console.error("Error mejorando texto", error);
       setToastMessage("Hubo un error al mejorar el texto.");
       setTimeout(() => setToastMessage(null), 3000);
     } finally {

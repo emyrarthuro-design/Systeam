@@ -44,7 +44,7 @@ export default function Dashboard() {
           setDiagnosis(diag);
         }
       } catch (err) {
-        console.error("Error loading diagnosis", err);
+        if (import.meta.env.DEV) console.error("Error loading diagnosis", err);
       }
       setLoading(false);
     };

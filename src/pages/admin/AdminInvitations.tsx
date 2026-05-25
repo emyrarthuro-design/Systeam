@@ -85,7 +85,7 @@ export default function AdminInvitations() {
       setInvitations(data);
       setLoading(false);
     }, (err) => {
-      console.error(err);
+      if (import.meta.env.DEV) console.error(err);
       setLoading(false);
     });
     return () => unsubscribe();
@@ -147,7 +147,7 @@ export default function AdminInvitations() {
       setFormData({ name: '', email: '', country: 'México', whatsapp: '+52 ', notes: '' });
       toast.success('Invitación generada');
     } catch (error) {
-      console.error(error);
+      if (import.meta.env.DEV) console.error(error);
       toast.error('Error al crear invitación');
     }
   };
@@ -192,7 +192,7 @@ export default function AdminInvitations() {
       setShowDeleteModal(null);
       setConfirmText('');
     } catch (error) {
-      console.error(error);
+      if (import.meta.env.DEV) console.error(error);
       toast.error('Error al eliminar');
     }
   };
@@ -209,7 +209,7 @@ export default function AdminInvitations() {
       });
       loadInvitations();
     } catch (error) {
-      console.error(error);
+      if (import.meta.env.DEV) console.error(error);
     }
   };
 

@@ -36,7 +36,7 @@ export default function Results() {
           localStorage.setItem('systeam_diagnosis', JSON.stringify(typedData));
         }
       } catch (err) {
-        console.error("Error loading results from DB", err);
+        if (import.meta.env.DEV) console.error("Error loading results from DB", err);
       }
       setLoading(false);
     };
@@ -56,12 +56,9 @@ export default function Results() {
       const { doc, deleteDoc } = await import('firebase/firestore');
       const { db } = await import('../lib/firebase');
       
-      console.log(`[REDO] Deleting previous diagnostic doc for user: ${user.uid}`);
       try {
         await deleteDoc(doc(db, 'diagnostics', user.uid));
-        console.log("[REDO] Diagnostic doc deleted (or didn't exist)");
       } catch (err) {
-        console.log('[REDO] No previous diagnostic to delete, continuing');
       }
 
       const newData = {
@@ -81,12 +78,11 @@ export default function Results() {
       await saveDiagnosisDebounced(user.uid, newData);
       await updateUserDiagnosisStatus(user.uid, 'in_progress');
       
-      console.log('[REDO] New empty diagnostic saved');
 
       localStorage.setItem('systeam_diagnosis', JSON.stringify(newData));
       navigate('/bloque/1');
     } catch (err) {
-      console.error("Error restarting diagnosis:", err);
+      if (import.meta.env.DEV) console.error("Error restarting diagnosis:", err);
       toast.error("Hubo un error al reiniciar el diagnóstico.");
     }
   };
@@ -124,7 +120,7 @@ export default function Results() {
       setDiagnosis(updatedData);
       toast.success('Análisis regenerado con éxito');
     } catch (err: any) {
-      console.error("Error regenerating analysis:", err);
+      if (import.meta.env.DEV) console.error("Error regenerating analysis:", err);
       toast.error("Hubo un error al regenerar el análisis: " + (err.message || String(err)));
     } finally {
       setLoading(false);

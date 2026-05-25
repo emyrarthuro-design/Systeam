@@ -72,7 +72,7 @@ export default function AdminSettings() {
       downloadCSV(`systeam-diagnosticos-${dateStr}.csv`, headers, data);
       setMessageCsv(`Exportados ${data.length} diagnósticos exitosamente.`);
     } catch (err: any) {
-      console.error(err);
+      if (import.meta.env.DEV) console.error(err);
       setMessageCsv('Error al exportar CSV: ' + err.message);
     } finally {
       setLoadingCsv(false);
@@ -115,7 +115,7 @@ export default function AdminSettings() {
 
       setMessageClean(`Limpieza exitosa. Se eliminaron ${usersDeleted} usuarios y ${diagsDeleted} diagnósticos de prueba.`);
     } catch (err: any) {
-      console.error(err);
+      if (import.meta.env.DEV) console.error(err);
       setMessageClean('Error al limpiar datos: ' + err.message);
     } finally {
       setLoadingClean(false);
@@ -157,7 +157,7 @@ export default function AdminSettings() {
 
       setMessage('Datos de prueba creados exitosamente. Los alumnos requieren Firebase Auth real para funcionar logueados, pero las invitaciones ya están listadas.');
     } catch (err: any) {
-      console.error(err);
+      if (import.meta.env.DEV) console.error(err);
       setMessage('Error al crear datos de prueba: ' + err.message);
     } finally {
       setLoading(false);
