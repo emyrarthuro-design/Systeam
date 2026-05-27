@@ -144,8 +144,12 @@ export default function DiagnosisFlow() {
         JSON.stringify(updatedDiagnosis),
       );
 
-      const { saveDiagnosisDebounced } = await import("../lib/db");
-      await saveDiagnosisDebounced(user.uid, updatedDiagnosis);
+      try {
+        const { saveDiagnosisDebounced } = await import("../lib/db");
+        await saveDiagnosisDebounced(user.uid, updatedDiagnosis);
+      } catch (err) {
+        if (import.meta.env.DEV) console.error("Error en autoguardado:", err);
+      }
     }, 1000); // reduced to 1s as per request
 
     return () => clearTimeout(timer);

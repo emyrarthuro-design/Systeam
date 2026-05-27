@@ -32,7 +32,8 @@ export async function fetchDiagnosis(userId: string) {
     }
     return null;
   } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
+    if (import.meta.env.DEV) console.error("Error fetching diagnosis:", error);
+    return null;
   }
 }
 
@@ -42,7 +43,7 @@ export async function saveDiagnosisDebounced(userId: string, data: any) {
     const docRef = doc(db, 'diagnostics', userId);
     await setDoc(docRef, data, { merge: true });
   } catch (error) {
-    handleFirestoreError(error, OperationType.WRITE, path);
+    if (import.meta.env.DEV) console.error("Error saving diagnosis:", error);
   }
 }
 
@@ -52,7 +53,7 @@ export async function updateUserDiagnosisStatus(userId: string, status: string) 
     const docRef = doc(db, 'users', userId);
     await updateDoc(docRef, { diagnosticStatus: status });
   } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, path);
+    if (import.meta.env.DEV) console.error("Error updating status:", error);
   }
 }
 
