@@ -29,7 +29,8 @@ export default function Dashboard() {
 
     const loadData = async () => {
       try {
-        const data = await fetchDiagnosis(user.uid);
+        const { loadLatestDiagnosis } = await import('../lib/db');
+        const data = await loadLatestDiagnosis(user.uid);
         if (data) {
           let diag = data as Diagnosis;
           

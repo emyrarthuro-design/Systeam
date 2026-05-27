@@ -156,3 +156,37 @@ export async function deleteUserCompletely(params: {
   }
 }
 
+export async function loadLatestDiagnosis(userId: string): Promise<any | null> {
+  let localData: any = null;
+  try {
+    const raw = localStorage.getItem('systeam_diagnosis');
+    if (raw) localData = JSON.parse(raw);
+  } catch (e) {
+    if (import.meta.env.DEV) console.error('Error parsing local diagnosis:', e);
+  }
+
+  const dbData = await fetchDiagnosis(userId).catch((err) => {
+    if (import.meta.env.DEV) console.error('Error fetching diagnosis:', err);
+    return null;
+  });
+
+  let winner: any = null;
+  if (localData && dbData) {
+    const localTime = new Date(localData.updatedAt || 0).getTime();
+    const dbTime = new Date((dbData as any).updatedAt || 0).getTime();
+    winner = localTime >= dbTime ? localData : dbData;
+  } else {
+    winner = localData || dbData;
+  }
+
+  if (winner) {
+    try {
+      localStorage.setItem('systeam_diagnosis', JSON.stringify(winner));
+    } catch (e) {
+      if (import.meta.env.DEV) console.error('Error syncing local diagnosis:', e);
+    }
+  }
+
+  return winner;
+}
+

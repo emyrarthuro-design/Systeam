@@ -18,25 +18,12 @@ export default function Results() {
     if (!user) return;
 
     const loadData = async () => {
-      // 1. Try local storage first
-      const localData = localStorage.getItem('systeam_diagnosis');
-      if (localData) {
-        setDiagnosis(JSON.parse(localData) as Diagnosis);
-        setLoading(false);
-        return;
-      }
-
-      // 2. Try Firestore if local is empty
       try {
-        const { fetchDiagnosis: fetchDbDiag } = await import('../lib/db');
-        const dbData = await fetchDbDiag(user.uid);
-        if (dbData) {
-          const typedData = dbData as Diagnosis;
-          setDiagnosis(typedData);
-          localStorage.setItem('systeam_diagnosis', JSON.stringify(typedData));
-        }
+        const { loadLatestDiagnosis } = await import('../lib/db');
+        const data = await loadLatestDiagnosis(user.uid);
+        if (data) setDiagnosis(data as Diagnosis);
       } catch (err) {
-        if (import.meta.env.DEV) console.error("Error loading results from DB", err);
+        if (import.meta.env.DEV) console.error('Error loading results:', err);
       }
       setLoading(false);
     };
