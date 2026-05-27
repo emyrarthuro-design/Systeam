@@ -148,11 +148,9 @@ export default function Results() {
 
       {/* Print-only Logo Header */}
       <div className="hidden print:block mb-8 text-center border-b border-gray-200 pb-8 pt-8">
-        <img 
-          src="https://lh3.googleusercontent.com/d/1zXqu1TlWTrc2neVP2Vy62F703BUWHFvZ" 
-          alt="SysTeam Logo" 
-          className="h-20 object-contain mx-auto mb-4"
-        />
+        <div className="font-sans font-bold tracking-tight lowercase text-gray-900 text-5xl mb-4">
+          systeam<span className="text-amber-600">.</span>
+        </div>
         <h1 className="text-2xl font-black uppercase tracking-widest text-gray-900">REPORTE OFICIAL DE DIAGNÓSTICO</h1>
         <p className="text-sm text-gray-500 uppercase">SysTeam Latam Incubadora</p>
       </div>
