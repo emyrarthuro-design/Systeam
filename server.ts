@@ -6,7 +6,12 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 import fs from "fs";
 import admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 import rateLimit from 'express-rate-limit';
+
+// Read config for database ID
+const firebaseConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'firebase-applet-config.json'), 'utf-8'));
+const databaseId = firebaseConfig.firestoreDatabaseId || '(default)';
 
 let adminApp: admin.app.App | null = null;
 
@@ -93,6 +98,19 @@ async function startServer() {
 
   app.use(express.json());
 
+  app.get('/api/invitations/test-all', async (req, res) => {
+    try {
+      const adminInstance = getFirebaseAdmin();
+      const firestore = getFirestore(adminInstance, databaseId);
+      const snap = await firestore.collection('invitations').get();
+      const numInvitations = snap.size;
+      const all = snap.docs.map(d => ({id: d.id, email: d.data().email}));
+      return res.json({ size: numInvitations, invitations: all, databaseId });
+    } catch(err: any) {
+      return res.status(500).json({ error: String(err) });
+    }
+  });
+
   app.post('/api/invitations/validate', invitationValidationLimiter, async (req, res) => {
     try {
       const { email } = req.body;
@@ -101,11 +119,15 @@ async function startServer() {
       }
 
       const adminInstance = getFirebaseAdmin();
-      const firestore = adminInstance.firestore();
+      const firestore = getFirestore(adminInstance, databaseId);
       
+      console.log(`[VALIDATE-INVITATIONS] Querying email: ${email.toLowerCase().trim()} in db: ${databaseId}`);
+
       const invSnap = await firestore.collection('invitations')
         .where('email', '==', email.toLowerCase().trim())
         .get();
+
+      console.log(`[VALIDATE-INVITATIONS] Results found: ${invSnap.size}`);
 
       if (invSnap.empty) {
         return res.status(404).json({ error: "not_found" });
@@ -140,7 +162,7 @@ async function startServer() {
       }
 
       // We enforce that the invitation belongs to the authenticated user's email
-      const firestore = adminInstance.firestore();
+      const firestore = getFirestore(adminInstance, databaseId);
       const invDocRef = firestore.collection('invitations').doc(invitationId);
       const invSnap = await invDocRef.get();
       
@@ -190,7 +212,7 @@ async function startServer() {
       }
 
       const adminInstance = getFirebaseAdmin();
-      const firestore = adminInstance.firestore();
+      const firestore = getFirestore(adminInstance, databaseId);
 
       const userDocRef = firestore.collection('users').doc(targetUid);
       const userDocSnap = await userDocRef.get();

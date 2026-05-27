@@ -47,7 +47,7 @@ export default function AdminStudents() {
                 const blockMatch = key.match(/^block_(\d+)/);
                 if (blockMatch) answeredBlocks.add(blockMatch[1]);
               });
-              progressPct = Math.round((answeredBlocks.size / 8) * 100);
+              progressPct = Math.min(100, Math.round((answeredBlocks.size / 9) * 100));
             }
           }
 
@@ -199,10 +199,13 @@ export default function AdminStudents() {
                       <td className="px-6 py-4">
                         <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${
                           student.diagnosticStatus === 'completed' ? 'bg-green-500/10 text-green-500' :
+                          student.progressPct === 100 ? 'bg-amber-500/10 text-amber-500' :
                           student.diagnosticStatus === 'in_progress' ? 'bg-sys-accent/10 text-sys-accent' :
                           'bg-gray-500/10 text-gray-400'
                         }`}>
-                          {student.diagnosticStatus === 'completed' ? 'COMPLETADO' : student.diagnosticStatus === 'in_progress' ? 'EN PROGRESO' : 'NO INICIADO'}
+                          {student.diagnosticStatus === 'completed' ? 'COMPLETADO' : 
+                           student.progressPct === 100 ? 'LISTO P/ ENVIAR' : 
+                           student.diagnosticStatus === 'in_progress' ? 'EN PROGRESO' : 'NO INICIADO'}
                         </span>
                       </td>
                       <td className="px-6 py-4">
