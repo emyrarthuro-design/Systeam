@@ -121,13 +121,9 @@ async function startServer() {
       const adminInstance = getFirebaseAdmin();
       const firestore = getFirestore(adminInstance, databaseId);
       
-      console.log(`[VALIDATE-INVITATIONS] Querying email: ${email.toLowerCase().trim()} in db: ${databaseId}`);
-
       const invSnap = await firestore.collection('invitations')
         .where('email', '==', email.toLowerCase().trim())
         .get();
-
-      console.log(`[VALIDATE-INVITATIONS] Results found: ${invSnap.size}`);
 
       if (invSnap.empty) {
         return res.status(404).json({ error: "not_found" });
@@ -190,9 +186,7 @@ async function startServer() {
   // API endpoints
   app.post("/api/admin/delete-user", async (req, res) => {
     try {
-      console.log("[DELETE-USER] Request received for target:", req.body.targetEmail);
       const caller = await verifyAdminCaller(req);
-      console.log(`[DELETE-USER] Caller verified: ${caller.email} (super_admin: ${caller.isSuperAdmin})`);
 
       const { targetUid, targetEmail, confirmationName } = req.body;
       if (!targetUid || !targetEmail || !confirmationName) {
@@ -231,8 +225,6 @@ async function startServer() {
          return res.status(400).json({ error: "Confirmation name does not match" });
       }
 
-      console.log("[DELETE-USER] Protections passed for target:", targetEmail);
-
       let diagnosticsArchived = 0;
       let invitationsDeleted = 0;
       let authAccountDeleted = false;
@@ -253,7 +245,6 @@ async function startServer() {
           await doc.ref.delete();
           diagnosticsArchived++;
         }
-        console.log(`[DELETE-USER] Archived ${diagnosticsArchived} diagnostics`);
       } catch (err: any) {
         errors.push(`Diagnostics archive error: ${err.message}`);
         console.error("Diagnostics archive error:", err);
@@ -266,7 +257,6 @@ async function startServer() {
            await doc.ref.delete();
            invitationsDeleted++;
         }
-        console.log(`[DELETE-USER] Deleted ${invitationsDeleted} invitations`);
       } catch (err: any) {
          errors.push(`Invitations delete error: ${err.message}`);
          console.error("Invitations delete error:", err);
@@ -275,7 +265,6 @@ async function startServer() {
       // iii) Delete user profile
       try {
         await userDocRef.delete();
-        console.log("[DELETE-USER] Deleted user profile");
       } catch (err: any) {
          errors.push(`User profile delete error: ${err.message}`);
          console.error("User profile delete error:", err);
@@ -285,10 +274,8 @@ async function startServer() {
       try {
         await adminInstance.auth().deleteUser(targetUid);
          authAccountDeleted = true;
-         console.log("[DELETE-USER] Deleted Auth account");
       } catch (err: any) {
          if (err.code === 'auth/user-not-found') {
-            console.log("[DELETE-USER] Auth account already didn't exist");
             authAccountDeleted = true; // functionally deleted
          } else {
             console.error("Auth delete error:", err);
@@ -313,7 +300,6 @@ async function startServer() {
            errors
         });
         auditLogId = auditLogRef.id;
-        console.log("[DELETE-USER] Audit log written");
       } catch (err: any) {
          console.error("Audit log error:", err);
       }
