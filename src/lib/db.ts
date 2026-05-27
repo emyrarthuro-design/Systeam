@@ -23,7 +23,6 @@ export async function createOrUpdateStudentProfile(userAuth: { uid: string, emai
 }
 
 export async function fetchDiagnosis(userId: string) {
-  const path = `diagnostics/${userId}`;
   try {
     const docRef = doc(db, 'diagnostics', userId);
     const docSnap = await getDoc(docRef);
@@ -38,7 +37,6 @@ export async function fetchDiagnosis(userId: string) {
 }
 
 export async function saveDiagnosisDebounced(userId: string, data: any) {
-  const path = `diagnostics/${userId}`;
   try {
     const docRef = doc(db, 'diagnostics', userId);
     await setDoc(docRef, data, { merge: true });
@@ -48,7 +46,6 @@ export async function saveDiagnosisDebounced(userId: string, data: any) {
 }
 
 export async function updateUserDiagnosisStatus(userId: string, status: string) {
-  const path = `users/${userId}`;
   try {
     const docRef = doc(db, 'users', userId);
     await updateDoc(docRef, { diagnosticStatus: status });
@@ -58,9 +55,8 @@ export async function updateUserDiagnosisStatus(userId: string, status: string) 
 }
 
 export async function logActivity(log: Omit<ActivityLog, 'id' | 'timestamp'>) {
-  const path = 'activity_logs';
   try {
-    await addDoc(collection(db, path), {
+    await addDoc(collection(db, 'activity_logs'), {
       ...log,
       timestamp: new Date().toISOString()
     });

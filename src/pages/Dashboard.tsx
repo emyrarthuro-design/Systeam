@@ -4,7 +4,7 @@ import { Diagnosis } from '../types';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle2, Circle, Clock, ChevronRight, BarChart3, ArrowUpRight, AlertTriangle, Lock as LockIcon } from 'lucide-react';
-import { fetchDiagnosis, saveDiagnosisDebounced, updateUserDiagnosisStatus } from '../lib/db';
+import { saveDiagnosisDebounced, updateUserDiagnosisStatus } from '../lib/db';
 
 const BLOCKS = [
   { id: 1, name: 'Punto de Partida' },

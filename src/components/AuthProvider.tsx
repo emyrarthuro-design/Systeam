@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { UserProfile } from '../types';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { isSuperAdmin as checkSuperAdmin, isAnyAdmin as checkAnyAdmin } from '../lib/admins';
 
 interface AuthContextType {
