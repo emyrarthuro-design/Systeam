@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { UserProfile } from '../types';
-import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { isSuperAdmin as checkSuperAdmin, isAnyAdmin as checkAnyAdmin } from '../lib/admins';
@@ -41,7 +41,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser({ uid: firebaseUser.uid, email: firebaseUser.email || '' });
         
         // Listen to profile changes
-        const path = `users/${firebaseUser.uid}`;
         unsubProfile = onSnapshot(doc(db, 'users', firebaseUser.uid), (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data() as UserProfile;
@@ -51,8 +50,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           setLoading(false);
         }, (error) => {
+          if (import.meta.env.DEV) console.error('Error en listener de perfil:', error);
+          setProfile(null);
           setLoading(false);
-          handleFirestoreError(error, OperationType.GET, path);
         });
       } else {
         setUser(null);
