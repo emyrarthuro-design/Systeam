@@ -1,5 +1,5 @@
 import { db, handleFirestoreError, OperationType } from './firebase';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, serverTimestamp, getDocs, query, where, writeBatch } from 'firebase/firestore';
 import { ActivityLog, Diagnosis, Invitation, UserProfile } from '../types';
 
 export async function createOrUpdateStudentProfile(userAuth: { uid: string, email: string }, invitation: Partial<Invitation>) {
@@ -185,4 +185,68 @@ export async function loadLatestDiagnosis(userId: string): Promise<any | null> {
 
   return winner;
 }
+
+export async function fetchTags(): Promise<any[]> {
+  try {
+    const snap = await getDocs(collection(db, 'tags'));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    if (import.meta.env.DEV) console.error('Error fetching tags:', err);
+    return [];
+  }
+}
+
+export async function createTag(tag: { name: string; color: string; createdBy: string; createdByName: string }): Promise<string | null> {
+  try {
+    const id = `tag_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    await setDoc(doc(db, 'tags', id), {
+      name: tag.name.trim(),
+      color: tag.color,
+      createdBy: tag.createdBy,
+      createdByName: tag.createdByName,
+      createdAt: new Date().toISOString()
+    });
+    return id;
+  } catch (err) {
+    if (import.meta.env.DEV) console.error('Error creating tag:', err);
+    return null;
+  }
+}
+
+export async function updateTag(id: string, data: { name?: string; color?: string }): Promise<boolean> {
+  try {
+    await updateDoc(doc(db, 'tags', id), data);
+    return true;
+  } catch (err) {
+    if (import.meta.env.DEV) console.error('Error updating tag:', err);
+    return false;
+  }
+}
+
+export async function deleteTag(id: string): Promise<boolean> {
+  try {
+    const usersSnap = await getDocs(query(collection(db, 'users'), where('tagId', '==', id)));
+    const batch = writeBatch(db);
+    usersSnap.docs.forEach(userDoc => {
+      batch.update(userDoc.ref, { tagId: null });
+    });
+    batch.delete(doc(db, 'tags', id));
+    await batch.commit();
+    return true;
+  } catch (err) {
+    if (import.meta.env.DEV) console.error('Error deleting tag:', err);
+    return false;
+  }
+}
+
+export async function assignTagToUser(userId: string, tagId: string | null): Promise<boolean> {
+  try {
+    await updateDoc(doc(db, 'users', userId), { tagId });
+    return true;
+  } catch (err) {
+    if (import.meta.env.DEV) console.error('Error assigning tag:', err);
+    return false;
+  }
+}
+
 

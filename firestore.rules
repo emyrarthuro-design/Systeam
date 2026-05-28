@@ -108,5 +108,11 @@ service cloud.firestore {
       allow create: if isAdmin();
       allow update, delete: if false;
     }
+    
+    // TAGS
+    match /tags/{tagId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
   }
 }

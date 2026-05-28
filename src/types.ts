@@ -9,6 +9,7 @@ export interface UserProfile {
   createdAt: string;
   diagnosticStatus?: DiagnosisStatus;
   isSystemUser?: boolean;
+  tagId?: string | null;
 }
 
 export type DiagnosisStatus = 'pending' | 'in_progress' | 'not_started' | 'completed';
@@ -130,3 +131,13 @@ export interface ActivityLog {
   targetName?: string;
   details?: Record<string, any>;
 }
+
+export interface Tag {
+  id: string;
+  name: string;
+  color: string;
+  createdBy: string;
+  createdByName: string;
+  createdAt: string;
+}
+

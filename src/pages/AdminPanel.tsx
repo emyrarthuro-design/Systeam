@@ -11,7 +11,8 @@ import {
   LogOut,
   ChevronRight,
   Shield,
-  Key
+  Key,
+  Tag
 } from 'lucide-react';
 import { parseDate } from '../lib/dateUtils';
 import { ensureSuperAdmin, ensureAdmin } from '../lib/db';
@@ -22,6 +23,7 @@ import AdminStudentDetail from './admin/AdminStudentDetail';
 import AdminInvitations from './admin/AdminInvitations';
 import AdminSettings from './admin/AdminSettings';
 import AdminRoleManagement from './admin/AdminRoleManagement';
+import AdminTags from './admin/AdminTags';
 
 export default function AdminPanel() {
   const { logout, profile, user, isSuperAdmin } = useAuth();
@@ -63,6 +65,7 @@ export default function AdminPanel() {
       needsAttention: pendingInvitations.some(i => !i.lastSentAt && Math.floor((new Date().getTime() - (parseDate(i.createdAt)?.getTime() || 0)) / (1000 * 3600 * 24)) > 7)
     },
     ...(isSuperAdmin ? [{ name: 'Gestión de Roles', path: '/admin/roles', exact: false, icon: Shield }] : []),
+    { name: 'Etiquetas', path: '/admin/tags', exact: false, icon: Tag },
     { name: 'Configuración', path: '/admin/settings', exact: false, icon: Settings },
   ];
 
@@ -163,6 +166,7 @@ export default function AdminPanel() {
           <Route path="/students/:id" element={<AdminStudentDetail />} />
           <Route path="/invitations" element={<AdminInvitations />} />
           <Route path="/roles" element={isSuperAdmin ? <AdminRoleManagement /> : <Navigate to="/admin" />} />
+          <Route path="/tags" element={<AdminTags />} />
           <Route path="/settings" element={<AdminSettings />} />
         </Routes>
       </main>
