@@ -87,20 +87,35 @@ export default function AdminStudents() {
 
   const handleExport = () => {
     const headers = [
-      'nombre', 'email', 'país', 'fecha_registro', 'progreso_pct', 'estado', 'perfil_predominante'
+      'nombre', 'email', 'país', 'fecha_registro', 'progreso_pct', 'estado', 'perfil_predominante', 'etiqueta'
     ];
-    
-    const data = students.map(s => [
-      s.fullName, 
-      s.email, 
-      s.country || '', 
-      s.createdAt ? formatIso(s.createdAt) : '',
-      s.progressPct + '%',
-      s.diagnosticStatus,
-      s.profile || ''
-    ]);
 
-    downloadCSV('systeam_alumnos.csv', headers, data);
+    const data = filteredStudents.map(s => {
+      const studentTag = tags.find(t => t.id === s.tagId);
+      return [
+        s.fullName,
+        s.email,
+        s.country || '',
+        s.createdAt ? formatIso(s.createdAt) : '',
+        s.progressPct + '%',
+        s.diagnosticStatus,
+        s.profile || '',
+        studentTag ? studentTag.name : (s.tagId ? '' : 'Sin etiqueta')
+      ];
+    });
+
+    let filename = 'systeam_alumnos';
+    if (selectedTagFilter === 'none') {
+      filename += '_sin_etiqueta';
+    } else if (selectedTagFilter !== 'all') {
+      const activeTag = tags.find(t => t.id === selectedTagFilter);
+      if (activeTag) {
+        filename += '_' + activeTag.name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+      }
+    }
+    filename += '.csv';
+
+    downloadCSV(filename, headers, data);
   };
 
   const executeDelete = async () => {
