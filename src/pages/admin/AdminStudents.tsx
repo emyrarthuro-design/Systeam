@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, getDocs, orderBy, where, onSnapshot } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
-import { Search, Download, FileText, CheckCircle, Trash2, Shield, AlertTriangle, Check, User, Loader2, Pencil } from 'lucide-react';
+import { Search, Download, FileText, CheckCircle, Trash2, Shield, AlertTriangle, Check, User, Loader2, Pencil, Tag, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import EditNameModal from '../../components/EditNameModal';
+import { getColorClasses } from './AdminTags';
 import { downloadCSV } from '../../lib/csv';
 import { formatDate, formatIso, parseDate } from '../../lib/dateUtils';
 import { useAuth } from '../../components/AuthProvider';
-import { logActivity, deleteUserCompletely } from '../../lib/db';
+import { logActivity, deleteUserCompletely, fetchTags, assignTagToUser } from '../../lib/db';
 import { toast } from 'react-hot-toast';
 
 export default function AdminStudents() {
@@ -22,8 +23,17 @@ export default function AdminStudents() {
   const [showDeleteModal, setShowDeleteModal] = useState<any>(null); // data: any
   const [confirmText, setConfirmText] = useState('');
   const [editingUser, setEditingUser] = useState<{id: string, name: string} | null>(null);
+  const [tags, setTags] = useState<any[]>([]);
+  const [selectedTagFilter, setSelectedTagFilter] = useState<string>('all');
+  const [openTagDropdown, setOpenTagDropdown] = useState<string | null>(null);
 
   useEffect(() => {
+    const loadAllTags = async () => {
+      const data = await fetchTags();
+      setTags(data);
+    };
+    loadAllTags();
+
     // We use real-time listeners for students list
     const q = query(collection(db, 'users'), where('role', 'in', ['student', 'user']));
     const unsubscribe = onSnapshot(q, async (snap) => {
@@ -127,7 +137,21 @@ export default function AdminStudents() {
     }
   };
 
-  const filteredStudents = students.filter(s => (s.fullName + s.email).toLowerCase().includes(search.toLowerCase()));
+  const handleAssignTag = async (studentId: string, tagId: string | null) => {
+    const ok = await assignTagToUser(studentId, tagId);
+    if (ok) {
+      setStudents(prev => prev.map(s => s.id === studentId ? { ...s, tagId } : s));
+      setOpenTagDropdown(null);
+    }
+  };
+
+  const filteredStudents = students.filter(s => {
+    const matchesSearch = (s.fullName + s.email).toLowerCase().includes(search.toLowerCase());
+    const matchesTag = selectedTagFilter === 'all' 
+      || (selectedTagFilter === 'none' && !s.tagId)
+      || s.tagId === selectedTagFilter;
+    return matchesSearch && matchesTag;
+  });
 
   return (
     <div className="space-y-6">
@@ -140,7 +164,7 @@ export default function AdminStudents() {
 
       <div className="card-geometric p-0 overflow-hidden flex flex-col">
           <div className="p-4 border-b border-sys-border flex gap-4">
-             <div className="relative flex-1">
+             <div className="relative flex-1 flex gap-3">
                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-sys-text-mut" size={18} />
                <input 
                  type="text" 
@@ -149,6 +173,17 @@ export default function AdminStudents() {
                  value={search}
                  onChange={e => setSearch(e.target.value)}
                />
+               <select 
+                 value={selectedTagFilter} 
+                 onChange={e => setSelectedTagFilter(e.target.value)}
+                 className="bg-sys-input border border-sys-border rounded-sm px-3 py-2 text-sm focus:outline-none focus:border-sys-accent text-sys-text-main"
+               >
+                 <option value="all">Todas las etiquetas</option>
+                 <option value="none">Sin etiqueta</option>
+                 {tags.map(t => (
+                   <option key={t.id} value={t.id}>{t.name}</option>
+                 ))}
+               </select>
              </div>
           </div>
           
@@ -160,6 +195,7 @@ export default function AdminStudents() {
                    <th className="px-6 py-3">Progreso</th>
                    <th className="px-6 py-3">Estado</th>
                    <th className="px-6 py-3">Perfil</th>
+                    <th className="px-6 py-3">Etiqueta</th>
                    <th className="px-6 py-3">Registro</th>
                    <th className="px-6 py-3"></th>
                  </tr>
@@ -216,6 +252,63 @@ export default function AdminStudents() {
                              {student.profile}
                            </span>
                          ) : <span className="text-sys-text-mut">—</span>}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="relative">
+                          {(() => {
+                            const studentTag = tags.find(t => t.id === student.tagId);
+                            const cc = studentTag ? getColorClasses(studentTag.color) : null;
+                            return (
+                              <button
+                                onClick={() => setOpenTagDropdown(openTagDropdown === student.id ? null : student.id)}
+                                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-sm border text-[10px] font-bold transition-all ${
+                                  studentTag && cc 
+                                    ? `${cc.border} ${cc.text} hover:opacity-80` 
+                                    : 'border-sys-border text-sys-text-mut hover:border-sys-accent'
+                                }`}
+                              >
+                                {studentTag && cc ? (
+                                  <>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${cc.bg}`}></span>
+                                    {studentTag.name}
+                                  </>
+                                ) : (
+                                  <>+ Asignar</>
+                                )}
+                                <ChevronDown size={10} />
+                              </button>
+                            );
+                          })()}
+                          {openTagDropdown === student.id && (
+                            <div className="absolute z-20 mt-1 left-0 bg-sys-bg border border-sys-border rounded-sm shadow-xl min-w-[160px] py-1 max-h-60 overflow-y-auto">
+                              {student.tagId && (
+                                <button
+                                  onClick={() => handleAssignTag(student.id, null)}
+                                  className="w-full text-left px-3 py-1.5 text-[10px] font-bold uppercase text-sys-text-mut hover:bg-sys-input"
+                                >
+                                  Quitar etiqueta
+                                </button>
+                              )}
+                              {tags.length === 0 ? (
+                                <div className="px-3 py-2 text-[10px] text-sys-text-mut">No hay etiquetas. Crea una en /admin/tags</div>
+                              ) : (
+                                tags.map(t => {
+                                  const tcc = getColorClasses(t.color);
+                                  return (
+                                    <button
+                                      key={t.id}
+                                      onClick={() => handleAssignTag(student.id, t.id)}
+                                      className="w-full text-left px-3 py-1.5 text-[10px] font-bold flex items-center gap-2 hover:bg-sys-input"
+                                    >
+                                      <span className={`w-1.5 h-1.5 rounded-full ${tcc.bg}`}></span>
+                                      <span className={tcc.text}>{t.name}</span>
+                                    </button>
+                                  );
+                                })
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-sys-text-mut text-xs">
                          {formatDate(student.createdAt)}
