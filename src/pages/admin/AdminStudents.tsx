@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, getDocs, orderBy, where, onSnapshot } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../lib/firebase';
-import { Search, Download, FileText, CheckCircle, Trash2, Shield, AlertTriangle, Check, User, Loader2 } from 'lucide-react';
+import { Search, Download, FileText, CheckCircle, Trash2, Shield, AlertTriangle, Check, User, Loader2, Pencil } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import EditNameModal from '../../components/EditNameModal';
 import { downloadCSV } from '../../lib/csv';
 import { formatDate, formatIso, parseDate } from '../../lib/dateUtils';
 import { useAuth } from '../../components/AuthProvider';
@@ -20,6 +21,7 @@ export default function AdminStudents() {
   // Selection
   const [showDeleteModal, setShowDeleteModal] = useState<any>(null); // data: any
   const [confirmText, setConfirmText] = useState('');
+  const [editingUser, setEditingUser] = useState<{id: string, name: string} | null>(null);
 
   useEffect(() => {
     // We use real-time listeners for students list
@@ -223,6 +225,15 @@ export default function AdminStudents() {
                             <Link to={`/admin/students/${student.id}`} className="text-sys-bg bg-sys-text-sec hover:bg-sys-text-main py-1.5 px-4 text-[10px] font-black uppercase tracking-widest rounded-sm transition-all">
                                 Ver ficha
                             </Link>
+                            {isSuperAdmin && (
+                              <button 
+                                onClick={() => setEditingUser({ id: student.id, name: student.fullName || '' })}
+                                className="p-2 text-sys-text-mut hover:text-sys-accent hover:bg-sys-accent/10 rounded-sm transition-all"
+                                title="Editar nombre"
+                              >
+                                <Pencil size={16} />
+                              </button>
+                            )}
                             {isAdmin && canDelete && (
                               <button 
                                 onClick={() => {
@@ -301,6 +312,13 @@ export default function AdminStudents() {
           </div>
         </div>
       )}
+      <EditNameModal
+        userId={editingUser?.id || ''}
+        currentName={editingUser?.name || ''}
+        isOpen={!!editingUser}
+        onClose={() => setEditingUser(null)}
+        onSaved={() => setEditingUser(null)}
+      />
     </div>
   );
 }

@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { useAuth } from '../../components/AuthProvider';
-import { Shield, User, Trash2, UserPlus, ArrowDown, History, AlertTriangle, X, Check } from 'lucide-react';
+import { Shield, User, Trash2, UserPlus, ArrowDown, History, AlertTriangle, X, Check, Pencil } from 'lucide-react';
 import { formatDate } from '../../lib/dateUtils';
 import { toast } from 'react-hot-toast';
 import { logActivity } from '../../lib/db';
 import { UserProfile, UserRole } from '../../types';
 import { isSuperAdmin as checkSuperAdmin, SUPER_ADMIN_EMAILS } from '../../lib/admins';
+import EditNameModal from '../../components/EditNameModal';
 
 export default function AdminRoleManagement() {
   const { profile: currentAdmin, isSuperAdmin } = useAuth();
@@ -19,6 +20,7 @@ export default function AdminRoleManagement() {
   // Inline confirmation states
   const [pendingRoleChange, setPendingRoleChange] = useState<{email: string, role: string} | null>(null);
   const [pendingPromotion, setPendingPromotion] = useState<string | null>(null);
+  const [editingUser, setEditingUser] = useState<{id: string, name: string} | null>(null);
 
   // Create Admin form
   const [email, setEmail] = useState('');
@@ -303,6 +305,15 @@ export default function AdminRoleManagement() {
                           </div>
                         ) : (
                           <div className="flex items-center justify-end gap-2">
+                            {isSuperAdmin && (
+                              <button 
+                                onClick={() => setEditingUser({ id: admin.uid, name: admin.fullName || '' })}
+                                className="p-2 text-sys-text-mut hover:text-sys-accent hover:bg-sys-accent/10 rounded-sm transition-all"
+                                title="Editar nombre"
+                              >
+                                <Pencil size={16} />
+                              </button>
+                            )}
                             <button 
                               onClick={() => handleRoleChange(admin.uid, admin.email, admin.role === 'admin' ? 'student' : 'admin')}
                               className="p-2 text-sys-text-mut hover:text-sys-accent hover:bg-sys-accent-alpha rounded-sm transition-all"
@@ -470,6 +481,13 @@ export default function AdminRoleManagement() {
           </div>
         )}
       </div>
+      <EditNameModal
+        userId={editingUser?.id || ''}
+        currentName={editingUser?.name || ''}
+        isOpen={!!editingUser}
+        onClose={() => setEditingUser(null)}
+        onSaved={() => setEditingUser(null)}
+      />
     </div>
   );
 }
