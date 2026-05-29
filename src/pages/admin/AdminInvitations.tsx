@@ -143,7 +143,7 @@ export default function AdminInvitations() {
       setCreatedCode(code);
       setCreatedName(formData.name);
       setCreatedWhatsapp(cleanWhatsapp !== (COUNTRY_PREFIXES[formData.country] + ' ').trim() && cleanWhatsapp !== COUNTRY_PREFIXES[formData.country] ? cleanWhatsapp : null);
-      setCreatedEmail(formData.email);
+      setCreatedEmail(normalizedEmail);
       setFormData({ name: '', email: '', country: 'México', whatsapp: '+52 ', notes: '' });
       toast.success('Invitación generada');
     } catch (error) {

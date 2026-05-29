@@ -118,20 +118,37 @@ async function startServer() {
         return res.status(400).json({ error: "Email requerido" });
       }
 
+      const normalizedEmail = email.toLowerCase().trim();
       const adminInstance = getFirebaseAdmin();
       const firestore = getFirestore(adminInstance, databaseId);
-      
-      const invSnap = await firestore.collection('invitations')
-        .where('email', '==', email.toLowerCase().trim())
+
+      // Intento 1: búsqueda directa (rápida, caso normal)
+      let invSnap = await firestore.collection('invitations')
+        .where('email', '==', normalizedEmail)
         .get();
 
+      // Intento 2: fallback case-insensitive para invitaciones legacy mal normalizadas
       if (invSnap.empty) {
+        const allInvs = await firestore.collection('invitations').get();
+        const match = allInvs.docs.find(d => {
+          const docEmail = (d.data().email || '').toLowerCase().trim();
+          return docEmail === normalizedEmail;
+        });
+        if (match) {
+          // Auto-curar el documento normalizando el email guardado
+          try {
+            await match.ref.update({ email: normalizedEmail });
+          } catch (curErr) {
+            console.error("[VALIDATE-INVITATION] Error self-healing email:", curErr);
+          }
+          const invData = { id: match.id, ...match.data(), email: normalizedEmail };
+          return res.status(200).json({ invitation: invData });
+        }
         return res.status(404).json({ error: "not_found" });
       }
 
       const invDoc = invSnap.docs[0];
       const invData = { id: invDoc.id, ...invDoc.data() };
-      
       return res.status(200).json({ invitation: invData });
     } catch (err: any) {
       console.error("[VALIDATE-INVITATION] Error:", err);
