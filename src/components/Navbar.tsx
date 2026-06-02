@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
-import { LogOut, User as UserIcon, Shield } from 'lucide-react';
+import { LogOut, User as UserIcon, Shield, Video } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Diagnosis } from '../types';
 
@@ -56,6 +56,10 @@ export default function Navbar() {
         <div className="flex items-center gap-4">
           {user ? (
             <>
+              <Link to="/clases" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sys-text-sec hover:text-sys-accent transition-colors text-xs font-bold">
+                <Video size={14} />
+                Clases
+              </Link>
               {isAdmin && (
                 <Link to="/admin" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-sys-accent/10 text-sys-accent hover:bg-sys-accent/20 transition-colors text-xs font-bold mr-2">
                   <Shield size={14} />

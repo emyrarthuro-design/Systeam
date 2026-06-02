@@ -9,6 +9,7 @@ import Activate from './pages/Activate';
 import Dashboard from './pages/Dashboard';
 import DiagnosisFlow from './pages/DiagnosisFlow';
 import Results from './pages/Results';
+import Classes from './pages/Classes';
 import AdminPanel from './pages/AdminPanel';
 import Navbar from './components/Navbar';
 import { GlobalSpeechIndicator } from './components/GlobalSpeechIndicator';
@@ -52,6 +53,7 @@ function AppContent() {
           <Route path="/diagnosis/:blockId" element={<Navigate to={`/bloque/${location.pathname.split('/').pop()}`} replace />} />
           <Route path="/resultados" element={<PrivateRoute><Results /></PrivateRoute>} />
           <Route path="/results" element={<Navigate to="/resultados" replace />} />
+          <Route path="/clases" element={<PrivateRoute><Classes /></PrivateRoute>} />
           
           <Route path="/admin/*" element={
             <PrivateRoute adminOnly={true}>
