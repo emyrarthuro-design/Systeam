@@ -249,4 +249,54 @@ export async function assignTagToUser(userId: string, tagId: string | null): Pro
   }
 }
 
+export async function fetchClasses(): Promise<any[]> {
+  try {
+    const snap = await getDocs(collection(db, 'classes'));
+    const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    return list.sort((a: any, b: any) => (a.classNumber || 0) - (b.classNumber || 0));
+  } catch (err) {
+    if (import.meta.env.DEV) console.error('Error fetching classes:', err);
+    return [];
+  }
+}
+
+export async function createClass(data: { classNumber: number; title: string; description?: string; driveUrl: string; module?: string; createdBy: string }): Promise<string | null> {
+  try {
+    const id = `class_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    await setDoc(doc(db, 'classes', id), {
+      classNumber: data.classNumber,
+      title: data.title.trim(),
+      description: (data.description || '').trim(),
+      driveUrl: data.driveUrl.trim(),
+      module: (data.module || '').trim(),
+      createdAt: new Date().toISOString(),
+      createdBy: data.createdBy
+    });
+    return id;
+  } catch (err) {
+    if (import.meta.env.DEV) console.error('Error creating class:', err);
+    return null;
+  }
+}
+
+export async function updateClass(id: string, data: any): Promise<boolean> {
+  try {
+    await updateDoc(doc(db, 'classes', id), data);
+    return true;
+  } catch (err) {
+    if (import.meta.env.DEV) console.error('Error updating class:', err);
+    return false;
+  }
+}
+
+export async function deleteClass(id: string): Promise<boolean> {
+  try {
+    await deleteDoc(doc(db, 'classes', id));
+    return true;
+  } catch (err) {
+    if (import.meta.env.DEV) console.error('Error deleting class:', err);
+    return false;
+  }
+}
+
 

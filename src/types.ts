@@ -141,3 +141,15 @@ export interface Tag {
   createdAt: string;
 }
 
+export interface MentorClass {
+  id: string;
+  classNumber: number;
+  title: string;
+  description?: string;
+  driveUrl: string;
+  module?: string;
+  createdAt: string;
+  createdBy: string;
+}
+
+

@@ -12,7 +12,8 @@ import {
   ChevronRight,
   Shield,
   Key,
-  Tag
+  Tag,
+  Video
 } from 'lucide-react';
 import { parseDate } from '../lib/dateUtils';
 import { ensureSuperAdmin, ensureAdmin } from '../lib/db';
@@ -24,6 +25,7 @@ import AdminInvitations from './admin/AdminInvitations';
 import AdminSettings from './admin/AdminSettings';
 import AdminRoleManagement from './admin/AdminRoleManagement';
 import AdminTags from './admin/AdminTags';
+import AdminClasses from './admin/AdminClasses';
 
 export default function AdminPanel() {
   const { logout, profile, user, isSuperAdmin } = useAuth();
@@ -66,6 +68,7 @@ export default function AdminPanel() {
     },
     ...(isSuperAdmin ? [{ name: 'Gestión de Roles', path: '/admin/roles', exact: false, icon: Shield }] : []),
     { name: 'Etiquetas', path: '/admin/tags', exact: false, icon: Tag },
+    { name: 'Clases', path: '/admin/clases', exact: false, icon: Video },
     { name: 'Configuración', path: '/admin/settings', exact: false, icon: Settings },
   ];
 
@@ -167,6 +170,7 @@ export default function AdminPanel() {
           <Route path="/invitations" element={<AdminInvitations />} />
           <Route path="/roles" element={isSuperAdmin ? <AdminRoleManagement /> : <Navigate to="/admin" />} />
           <Route path="/tags" element={<AdminTags />} />
+          <Route path="/clases" element={<AdminClasses />} />
           <Route path="/settings" element={<AdminSettings />} />
         </Routes>
       </main>

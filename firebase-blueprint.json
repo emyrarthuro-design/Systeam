@@ -38,6 +38,34 @@
         }
       },
       "required": ["studentId", "status"]
+    },
+    "Tag": {
+      "title": "Student Tag",
+      "description": "Classification tags assigned to students.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "color": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdByName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "color", "createdBy"]
+    },
+    "MentorClass": {
+      "title": "Mentor Class",
+      "description": "Recorded classes and materials.",
+      "type": "object",
+      "properties": {
+        "classNumber": { "type": "number" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "driveUrl": { "type": "string" },
+        "module": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["classNumber", "title", "driveUrl", "createdBy"]
     }
   },
   "firestore": {
@@ -48,6 +76,14 @@
     "/diagnoses/{userId}": {
       "schema": "Diagnosis",
       "description": "The diagnosis for a specific user. Using userId as docId ensures one per user."
+    },
+    "/tags/{tagId}": {
+      "schema": "Tag",
+      "description": "Custom tags used by admins."
+    },
+    "/classes/{classId}": {
+      "schema": "MentorClass",
+      "description": "Recorded classes with Google Drive links."
     }
   }
 }
