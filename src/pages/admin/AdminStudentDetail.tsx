@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { ChevronLeft, Save, Loader2, Trash2, AlertTriangle, Shield, History, RotateCcw } from 'lucide-react';
+import { ChevronLeft, Save, Loader2, Trash2, AlertTriangle, Shield, History, RotateCcw, Printer } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { formatDateTime } from '../../lib/dateUtils';
 import { useAuth } from '../../components/AuthProvider';
@@ -29,6 +29,10 @@ export default function AdminStudentDetail() {
   const [confirmText, setConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+
+  const handleDownloadPDF = () => {
+    window.print();
+  };
 
   const isSystemAdmin = student?.role === 'admin' || student?.role === 'super_admin';
   const canDelete = isSuperAdmin || (!isSystemAdmin);
@@ -162,7 +166,7 @@ export default function AdminStudentDetail() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between print:hidden">
         <Link to="/admin/students" className="text-sys-text-mut hover:text-sys-accent flex items-center gap-1 text-sm font-bold">
           <ChevronLeft size={16} /> Volver a alumnos
         </Link>
@@ -177,27 +181,43 @@ export default function AdminStudentDetail() {
         )}
       </div>
       
-      <div className="card-geometric p-6">
-         <h1 className="text-3xl font-black">{student.fullName}</h1>
-         <div className="text-sys-text-sec text-sm mt-1">{student.email} • {student.country || 'Sin país'}</div>
-         
-         <div className="flex flex-wrap gap-2 mt-4">
-            <span className={`px-2 py-1 rounded text-xs font-bold ${
-              diagnosis?.status === 'completed' ? 'bg-green-500/10 text-green-500' :
-              diagnosis?.status === 'in_progress' ? 'bg-sys-accent/10 text-sys-accent' :
-              'bg-gray-500/10 text-gray-400'
-            }`}>
-              {diagnosis?.status === 'completed' ? 'COMPLETADO' : diagnosis?.status === 'in_progress' ? 'EN PROGRESO' : 'NO INICIADO'}
-            </span>
-            { (diagnosis?.analysis?.perfil_predominante || diagnosis?.result?.primaryProfile) && (
-               <span className="px-2 py-1 bg-sys-accent/10 text-sys-accent border border-sys-accent/30 rounded text-xs">
-                 Predominante: {diagnosis?.analysis?.perfil_predominante || diagnosis?.result?.primaryProfile}
+      <div className="card-geometric p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+         <div>
+            <h1 className="text-3xl font-black">{student.fullName}</h1>
+            <div className="text-sys-text-sec text-sm mt-1">{student.email} • {student.country || 'Sin país'}</div>
+            
+            <div className="flex flex-wrap gap-2 mt-4">
+               <span className={`px-2 py-1 rounded text-xs font-bold ${
+                 diagnosis?.status === 'completed' ? 'bg-green-500/10 text-green-500' :
+                 diagnosis?.status === 'in_progress' ? 'bg-sys-accent/10 text-sys-accent' :
+                 'bg-gray-500/10 text-gray-400'
+               }`}>
+                 {diagnosis?.status === 'completed' ? 'COMPLETADO' : diagnosis?.status === 'in_progress' ? 'EN PROGRESO' : 'NO INICIADO'}
                </span>
-            )}
+               { (diagnosis?.analysis?.perfil_predominante || diagnosis?.result?.primaryProfile) && (
+                  <span className="px-2 py-1 bg-sys-accent/10 text-sys-accent border border-sys-accent/30 rounded text-xs">
+                    Predominante: {diagnosis?.analysis?.perfil_predominante || diagnosis?.result?.primaryProfile}
+                  </span>
+               )}
+            </div>
          </div>
+
+         {isAdmin && (
+           <div className="flex flex-col items-end gap-2 print:hidden">
+             <button
+               onClick={handleDownloadPDF}
+               className="btn-geometric-secondary border-sys-border flex items-center gap-2 py-2 px-4 shadow-none print:hidden cursor-pointer"
+             >
+               <Printer size={16} /> Descargar PDF
+             </button>
+             <span className="text-sys-text-mut text-xs print:hidden">
+               Asegúrate de estar en la pestaña del diagnóstico antes de descargar.
+             </span>
+           </div>
+         )}
       </div>
       
-      <div className="flex border-b border-sys-border">
+      <div className="flex border-b border-sys-border print:hidden">
          {['ficha', 'nota', 'respuestas', 'metadatos'].map(tab => (
            <button 
              key={tab}
@@ -215,7 +235,7 @@ export default function AdminStudentDetail() {
         {activeTab === 'ficha' && (
            <div className="card-geometric relative">
              {diagnosis && diagnosis.status === 'completed' && (
-               <div className="absolute top-4 right-4 z-10 flex gap-2">
+               <div className="absolute top-4 right-4 z-10 flex gap-2 print:hidden">
                  <button
                    onClick={handleRegenerateAnalysis}
                    disabled={regenerating}
