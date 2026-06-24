@@ -95,7 +95,7 @@ export default function DiagnosisFlow() {
           }
 
           setDiagnosis(winner);
-          setLocalAnswers(winner.answers[`block_${currentBlockIndex}`] || {});
+          setLocalAnswers((winner.answers || {})[`block_${currentBlockIndex}`] || {});
           localStorage.setItem("systeam_diagnosis", JSON.stringify(winner));
         } else {
           const newDiag: Diagnosis = {
@@ -129,7 +129,7 @@ export default function DiagnosisFlow() {
     const timer = setTimeout(async () => {
       // Autosave current localAnswers to the diagnosis object
       const updatedAnswers = {
-        ...diagnosis.answers,
+        ...(diagnosis.answers || {}),
         [`block_${currentBlockIndex}`]: localAnswers,
       };
 
@@ -179,7 +179,7 @@ export default function DiagnosisFlow() {
     setSaving(true);
 
     const updatedAnswers = {
-      ...diagnosis.answers,
+      ...(diagnosis.answers || {}),
       [`block_${currentBlockIndex}`]: answers,
     };
 
@@ -260,7 +260,7 @@ export default function DiagnosisFlow() {
     try {
       // Ensure we have the latest answers from block 9 included
       const updatedAnswers = {
-        ...diagnosis.answers,
+        ...(diagnosis.answers || {}),
         [`block_${currentBlockIndex}`]: localAnswers,
       };
 

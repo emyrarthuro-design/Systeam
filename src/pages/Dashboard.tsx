@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle2, Circle, Clock, ChevronRight, BarChart3, ArrowUpRight, AlertTriangle, Lock as LockIcon } from 'lucide-react';
 import { saveDiagnosisDebounced, updateUserDiagnosisStatus } from '../lib/db';
+import { parseDate } from '../lib/dateUtils';
 
 const BLOCKS = [
   { id: 1, name: 'Punto de Partida' },
@@ -64,7 +65,8 @@ export default function Dashboard() {
   
   const completedBlocks = Object.keys(diagnosis?.answers || {}).filter(k => k.startsWith('block_') && k !== 'block_0' && k !== 'block_9').length;
   
-  const completedDate = diagnosis?.completedAt ? new Date(diagnosis.completedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : null;
+  const completedDateObj = parseDate(diagnosis?.completedAt);
+  const completedDate = completedDateObj ? completedDateObj.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : null;
 
   const handleStartProcess = async () => {
     if (!user) return;

@@ -15,7 +15,13 @@ export default function Navbar() {
     const loadDiagnosis = () => {
       const data = localStorage.getItem('systeam_diagnosis');
       if (data) {
-        setDiagnosis(JSON.parse(data) as Diagnosis);
+        try {
+          setDiagnosis(JSON.parse(data) as Diagnosis);
+        } catch (e) {
+          if (import.meta.env.DEV) console.error('localStorage corrupto, limpiando:', e);
+          localStorage.removeItem('systeam_diagnosis');
+          setDiagnosis(null);
+        }
       }
     };
     

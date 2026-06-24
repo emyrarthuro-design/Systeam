@@ -140,9 +140,9 @@ export function DiagnosisReport({ diagnosis }: DiagnosisReportProps) {
                 <div className="absolute top-0 -left-[9px] w-4 h-4 rounded-full bg-slate-900 border-2 border-slate-800 print:bg-white print:border-gray-200 flex items-center justify-center">
                   <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
                 </div>
-                <p className="text-sm text-slate-300 print:text-gray-800 mb-2">{ev.observacion}</p>
+                <p className="text-sm text-slate-300 print:text-gray-800 mb-2">{ev?.observacion}</p>
                 <div className="p-4 bg-slate-950/50 print:bg-gray-50 rounded-sm italic text-slate-500 print:text-gray-600 font-serif text-sm">
-                  "{ev.cita_alumno}" <span className="text-[10px] text-amber-500 ml-2 not-italic font-mono">{ev.bloque}</span>
+                  "{ev?.cita_alumno}" <span className="text-[10px] text-amber-500 ml-2 not-italic font-mono">{ev?.bloque}</span>
                 </div>
               </div>
             ))}
