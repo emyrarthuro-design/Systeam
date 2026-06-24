@@ -316,6 +316,7 @@ export default function DiagnosisFlow() {
         answers: updatedAnswers,
         progress: 100,
         status: "completed",
+        seenByAdmin: false,
         updatedAt: new Date().toISOString(),
         completedAt: new Date().toISOString(),
         analysis: aiAnalysisData,

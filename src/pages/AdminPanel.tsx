@@ -16,7 +16,7 @@ import {
   Video
 } from 'lucide-react';
 import { parseDate } from '../lib/dateUtils';
-import { ensureSuperAdmin, ensureAdmin } from '../lib/db';
+import { ensureSuperAdmin, ensureAdmin, countUnseenDiagnostics } from '../lib/db';
 
 import AdminDashboard from './admin/AdminDashboard';
 import AdminStudents from './admin/AdminStudents';
@@ -32,6 +32,7 @@ export default function AdminPanel() {
   const navigate = useNavigate();
   const location = useLocation();
   const [pendingInvitations, setPendingInvitations] = useState<any[]>([]);
+  const [unseenDiagnostics, setUnseenDiagnostics] = useState<number>(0);
 
   useEffect(() => {
     if (user) {
@@ -47,6 +48,13 @@ export default function AdminPanel() {
       snap.forEach(d => data.push({ id: d.id, ...d.data() }));
       setPendingInvitations(data);
     });
+
+    const loadUnseen = async () => {
+      const count = await countUnseenDiagnostics();
+      setUnseenDiagnostics(count);
+    };
+    loadUnseen();
+
     return () => unsubscribe();
   }, []);
 
@@ -57,7 +65,7 @@ export default function AdminPanel() {
 
   const navItems = [
     { name: 'Dashboard', path: '/admin', exact: true, icon: LayoutDashboard },
-    { name: 'Alumnos', path: '/admin/students', exact: false, icon: Users },
+    { name: 'Alumnos', path: '/admin/students', exact: false, icon: Users, badge: unseenDiagnostics > 0 ? unseenDiagnostics : null },
     { 
       name: 'Invitaciones', 
       path: '/admin/invitations', 

@@ -28,6 +28,7 @@ export interface Diagnosis {
   userEmail?: string;
   analysis?: DiagnosisAnalysis;
   internalNote?: InternalNote;
+  seenByAdmin?: boolean;
 }
 
 export interface DiagnosisAnalysis {

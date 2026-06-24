@@ -34,6 +34,12 @@ export default function AdminStudents() {
     };
     loadAllTags();
 
+    const markSeen = async () => {
+      const { markDiagnosticsAsSeen } = await import('../../lib/db');
+      await markDiagnosticsAsSeen();
+    };
+    markSeen();
+
     // We use real-time listeners for students list
     const q = query(collection(db, 'users'), where('role', 'in', ['student', 'user']));
     const unsubscribe = onSnapshot(q, async (snap) => {

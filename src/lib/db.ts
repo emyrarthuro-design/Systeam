@@ -299,4 +299,35 @@ export async function deleteClass(id: string): Promise<boolean> {
   }
 }
 
+export async function countUnseenDiagnostics(): Promise<number> {
+  try {
+    const snap = await getDocs(collection(db, 'diagnostics'));
+    return snap.docs.filter(d => {
+      const data = d.data();
+      return data.status === 'completed' && data.seenByAdmin === false;
+    }).length;
+  } catch (err) {
+    if (import.meta.env.DEV) console.error('Error counting unseen diagnostics:', err);
+    return 0;
+  }
+}
+
+export async function markDiagnosticsAsSeen(): Promise<boolean> {
+  try {
+    const snap = await getDocs(collection(db, 'diagnostics'));
+    const unseen = snap.docs.filter(d => {
+      const data = d.data();
+      return data.status === 'completed' && data.seenByAdmin === false;
+    });
+    if (unseen.length === 0) return true;
+    const batch = writeBatch(db);
+    unseen.forEach(d => batch.update(d.ref, { seenByAdmin: true }));
+    await batch.commit();
+    return true;
+  } catch (err) {
+    if (import.meta.env.DEV) console.error('Error marking diagnostics as seen:', err);
+    return false;
+  }
+}
+
 
