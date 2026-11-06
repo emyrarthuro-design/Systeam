@@ -173,7 +173,7 @@ export function registerRutaCeroRoutes(app: Express, deps: Deps) {
           (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string'
         ).slice(-MAX_MESSAGES)
         : [];
-      const messages: Message[] = [...existing, { role: 'user', content: input.trim() }].slice(-MAX_MESSAGES);
+      const messages: Message[] = [...existing, { role: 'user' as const, content: input.trim() }].slice(-MAX_MESSAGES);
       const context = [
         'Contexto guardado en el Workbook del estudiante (puede estar vacío):',
         'Fortalezas: ' + String(fields.fortalezas || '').slice(0, 1600),
@@ -200,7 +200,7 @@ export function registerRutaCeroRoutes(app: Express, deps: Deps) {
       });
       const answer = (response.text || '').trim();
       if (!answer) throw new Error('EMPTY_AI_RESPONSE');
-      const updated: Message[] = [...messages, { role: 'assistant', content: answer }].slice(-MAX_MESSAGES);
+      const updated: Message[] = [...messages, { role: 'assistant' as const, content: answer }].slice(-MAX_MESSAGES);
       await firestore.collection('rutaCeroConversations').doc(uid).collection('agents').doc(AGENT_ID).set({
         uid,
         agentId: AGENT_ID,
