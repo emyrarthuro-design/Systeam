@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import { registerRutaCeroRoutes } from "./src/server/rutaCero";
 dotenv.config();
 import express from "express";
 import path from "path";
@@ -495,6 +496,13 @@ ${textAnswers}
       console.error("Error in /api/improve-text:", err);
       res.status(500).json({ error: "Failed to improve text", details: err.message });
     }
+  });
+
+  registerRutaCeroRoutes(app, {
+    getFirebaseAdmin,
+    getAI,
+    databaseId,
+    isAdminEmail: (email) => SUPER_ADMIN_EMAILS.includes(email) || ADMIN_EMAILS.includes(email)
   });
 
   // Vite middleware for development
