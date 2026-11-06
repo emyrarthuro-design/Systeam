@@ -12,6 +12,8 @@ type Deps = {
   getFirebaseAdmin: () => admin.app.App;
   getAI: () => GoogleGenAI;
   databaseId: string;
+  // Optional injection for automated API tests, never supplied in production.
+  getFirestoreForApp?: (app: admin.app.App, databaseId: string) => ReturnType<typeof getFirestore>;
   isAdminEmail: (email: string) => boolean;
 };
 type Message = { role: 'user' | 'assistant'; content: string };
@@ -63,7 +65,9 @@ export function registerRutaCeroRoutes(app: Express, deps: Deps) {
     } catch {
       throw new Error('AUTH');
     }
-    const firestore = getFirestore(sdk, deps.databaseId);
+    const firestore = deps.getFirestoreForApp
+      ? deps.getFirestoreForApp(sdk, deps.databaseId)
+      : getFirestore(sdk, deps.databaseId);
     const userSnap = await firestore.collection('users').doc(decoded.uid).get();
     if (!userSnap.exists) throw new Error('AUTH');
     const email = (decoded.email || '').trim().toLowerCase();
