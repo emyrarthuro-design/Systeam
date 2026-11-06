@@ -60,6 +60,7 @@ async function verifyAdminCaller(req: express.Request): Promise<{
   const decoded = await adminInstance.auth().verifyIdToken(idToken);
   
   const email = (decoded.email || '').toLowerCase();
+  if (!decoded.email_verified) throw new Error('FORBIDDEN: Admin email is not verified');
   
   const isSuperAdmin = SUPER_ADMIN_EMAILS.includes(email);
   const isAdmin = isSuperAdmin || ADMIN_EMAILS.includes(email);
@@ -101,6 +102,7 @@ async function startServer() {
 
   app.get('/api/invitations/test-all', async (req, res) => {
     try {
+      await verifyAdminCaller(req);
       const adminInstance = getFirebaseAdmin();
       const firestore = getFirestore(adminInstance, databaseId);
       const snap = await firestore.collection('invitations').get();
