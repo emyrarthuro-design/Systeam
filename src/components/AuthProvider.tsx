@@ -27,6 +27,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<{ uid: string, email: string } | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [emailVerified, setEmailVerified] = useState(false);
 
   useEffect(() => {
     let unsubProfile: (() => void) | undefined;
@@ -39,6 +40,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (firebaseUser) {
         setUser({ uid: firebaseUser.uid, email: firebaseUser.email || '' });
+        setEmailVerified(firebaseUser.emailVerified);
         
         // Listen to profile changes
         unsubProfile = onSnapshot(doc(db, 'users', firebaseUser.uid), (docSnap) => {
@@ -56,6 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       } else {
         setUser(null);
+        setEmailVerified(false);
         setProfile(null);
         setLoading(false);
       }
@@ -71,8 +74,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await signOut(auth);
   };
 
-  const isSuperAdmin = profile?.role === 'super_admin' || checkSuperAdmin(user?.email);
-  const isAdmin = isSuperAdmin || profile?.role === 'admin' || checkAnyAdmin(user?.email);
+  // Los roles del perfil de Firestore no conceden privilegios por sí solos.
+  // La política del servidor exige correo verificado y cuenta autorizada.
+  const isSuperAdmin = emailVerified && checkSuperAdmin(user?.email);
+  const isAdmin = emailVerified && checkAnyAdmin(user?.email);
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, isAdmin, isSuperAdmin, logout }}>
