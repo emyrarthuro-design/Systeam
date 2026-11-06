@@ -62,6 +62,7 @@ export default function Navbar() {
         <div className="flex items-center gap-4">
           {user ? (
             <>
+              <Link to="/ruta-cero" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-amber-500 hover:text-amber-300 transition-colors text-xs font-bold">Ruta Cero</Link>
               <Link to="/clases" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sys-text-sec hover:text-sys-accent transition-colors text-xs font-bold">
                 <Video size={14} />
                 Clases
