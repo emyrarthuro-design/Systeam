@@ -9,7 +9,8 @@
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test:api": "tsx --test tests/rutaCero.test.ts"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
