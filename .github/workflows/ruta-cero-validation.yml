@@ -26,5 +26,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=critical
       - name: TypeScript validation
         run: npm run lint
+      - name: Ruta Cero API access and workbook tests
+        run: npm run test:api
       - name: Production build
         run: npm run build
