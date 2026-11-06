@@ -88,6 +88,26 @@ export default function RutaCero() {
     } finally { setBusy(false); }
   }
 
+  async function saveAngleFromReply(reply: string) {
+    // The student explicitly chooses the finished angle, so a tentative
+    // suggestion is never silently stored as their final result.
+    const unformatted = reply.replace(/[*_`]/g, '');
+    const extracted = unformatted.match(/Podría diferenciarme ayudando a[^\n]{15,700}/i)?.[0]?.trim();
+    if (!extracted) {
+      setError('No encontré un Ángulo de Oportunidad final en esta respuesta.');
+      return;
+    }
+    const angle = extracted.replace(/^["“]|["”]$/g, '').slice(0, 1800);
+    setSaving(true); setError(''); setSuccess(false);
+    try {
+      const result = await api('workbook', { method: 'POST', body: JSON.stringify({ fields: { anguloOportunidad: angle } }) });
+      setWorkbook(old => ({ ...old, ...result.workbook }));
+      setSuccess(true);
+      setActiveTab('workbook');
+    } catch (e: any) { setError(e.message); }
+    finally { setSaving(false); }
+  }
+
   async function enroll() {
     setBusy(true); setError(''); setSuccess(false);
     try {
@@ -143,7 +163,7 @@ export default function RutaCero() {
             <div className="px-4 md:px-6 py-4 border-b border-slate-800"><h2 className="font-bold">Cerebro de Mercado</h2><p className="text-slate-400 text-xs">Semana 1 · Día 2 · Conversación individual y privada</p></div>
             <div className="h-[430px] md:h-[540px] overflow-y-auto px-4 md:px-6 py-5 flex flex-col gap-4">
               {messages.length===0 && <div className="flex justify-start"><div className="max-w-[92%] rounded-2xl rounded-tl-sm px-4 py-3 bg-slate-800 text-slate-200 leading-relaxed text-sm">{greeting}</div></div>}
-              {messages.map((m,i)=><div key={i} className={'flex '+(m.role==='user'?'justify-end':'justify-start')}><div className={'max-w-[92%] md:max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed break-words '+(m.role==='user'?'bg-amber-500 text-slate-950 rounded-tr-sm':'bg-slate-800 text-slate-200 rounded-tl-sm')}><ReactMarkdown>{m.content}</ReactMarkdown></div></div>)}
+              {messages.map((m,i)=><div key={i} className={'flex '+(m.role==='user'?'justify-end':'justify-start')}><div className={'max-w-[92%] md:max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed break-words '+(m.role==='user'?'bg-amber-500 text-slate-950 rounded-tr-sm':'bg-slate-800 text-slate-200 rounded-tl-sm')}><ReactMarkdown>{m.content}</ReactMarkdown>{m.role==='assistant' && m.content.toLowerCase().includes('podría diferenciarme ayudando a') && <button type="button" disabled={saving} onClick={()=>void saveAngleFromReply(m.content)} className="mt-3 flex items-center gap-2 text-amber-400 hover:text-amber-300 font-bold text-xs disabled:opacity-50"><BookOpen size={14}/> Guardar este Ángulo en mi Workbook</button>}</div></div>)}
               {busy && <span className="text-xs text-slate-500">El asistente está elaborando una respuesta…</span>}
               <div ref={bottom}/>
             </div>
