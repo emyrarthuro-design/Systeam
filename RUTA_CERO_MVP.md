@@ -45,3 +45,13 @@ Nunca almacenes claves en el frontend ni en el repositorio.
 - Política de retención de conversaciones, exportación y borrado por estudiante.
 
 **Alcance**: implementación inicial para revisión; no se declara lista para producción hasta superar pruebas y despliegue.
+
+## Seguridad identificada durante validación
+
+La revisión encontró una antigua vía de alta administrativa que contenía una contraseña fija en código público. Se eliminó en esta rama, pero **el propietario de Firebase debe rotar la contraseña** de la cuenta afectada y revisar cuentas privilegiadas ya creadas. No se han cambiado credenciales reales.
+
+Se restringió la creación de perfiles en `firestore.rules` para impedir que un usuario se autoasigne roles privilegiados, y se exigió correo verificado para operaciones administrativas de servidor y frontend.
+
+**La modificación de `firestore.rules` no entra en vigor automáticamente al actualizar la aplicación web.** Antes de dar acceso a estudiantes, desplegar y verificar las reglas sobre la base Firestore concreta identificada en `firebase-applet-config.json`, y revisar los roles actuales de los perfiles existentes.
+
+La auditoría de dependencias encontró alertas previas (incluidas críticas); se intentan correcciones compatibles del lockfile en la rama, y cualquier alerta residual debe revisarse antes de publicación.
