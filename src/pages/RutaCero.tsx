@@ -198,11 +198,17 @@ export default function RutaCero() {
       setError('El resultado supera el límite del Workbook. Guarda una versión resumida o edítalo antes.');
       return;
     }
+    const patch: Record<string, string> = { [field]: value };
+    if (agentId === 'contenido' && contentMode === 'publicaciones') {
+      const clean = reply.replace(/\\*\\*/g, '');
+      const bio = clean.match(/^\\s*BIO:\\s*(.+)$/im)?.[1]?.trim();
+      if (bio && bio.length <= 150) patch.bio = bio;
+    }
     setSaving(true); setError(''); setSuccess('');
     try {
-      const data = await api('workbook', { method: 'POST', body: JSON.stringify({ fields: { [field]: value } }) });
-      setWorkbook(old => ({ ...old, [field]: data.workbook[field] }));
-      setSavedWorkbook(old => ({ ...old, [field]: data.workbook[field] }));
+      const data = await api('workbook', { method: 'POST', body: JSON.stringify({ fields: patch }) });
+      setWorkbook(old => ({ ...old, ...Object.fromEntries(Object.keys(patch).map(key => [key, data.workbook[key]])) }));
+      setSavedWorkbook(old => ({ ...old, ...Object.fromEntries(Object.keys(patch).map(key => [key, data.workbook[key]])) }));
       setSuccess('Resultado guardado en el Workbook.');
       setActiveTab('workbook');
     } catch (e: any) { setError(e.message); }
