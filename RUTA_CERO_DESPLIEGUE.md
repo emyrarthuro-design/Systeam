@@ -5,10 +5,10 @@
 ## Estado comprobado (6 noviembre 2026)
 
 - TypeScript y compilación de producción: aprobados por GitHub Actions.
-- 9 escenarios / 10 pruebas (incluye suite principal) de autenticación, inscripción, Workbook, chat y permisos: aprobados en una API simulada.
+- Pruebas automatizadas de autenticación, inscripción, Workbook, conversaciones por modo y permisos: verificadas en una API simulada. El número exacto de pruebas se consulta en GitHub Actions.
 - `npm audit --omit=dev --audit-level=critical`: pasa después de aplicar correcciones compatibles al lockfile. Quedan alertas de severidad alta y moderada por estudiar.
-- El estudiante puede seleccionar explícitamente "Guardar este Ángulo en mi Workbook" en una respuesta del asistente. No se guarda una hipótesis automáticamente sin su aprobación.
-- Cerebro de Mercado **todavía no dispone de búsqueda web**. Sus referencias se presentan como orientativas.
+- El estudiante puede guardar explícitamente su Ángulo de Oportunidad desde Cerebro de Mercado y sus ideas, publicaciones y sistema de 90 días desde Agente de Contenido; las conversaciones de los tres modos están separadas.
+- Ninguno de los dos agentes **dispone todavía de búsqueda web**. Las referencias de mercado se presentan como orientativas. No están implantados los desbloqueos académicos por semana.
 
 ## Bloqueadores previos a producción
 
@@ -27,6 +27,8 @@
 4. En el portal, activar una cuenta de prueba cuyo correo ya exista en `users`. No usar correos de estudiantes reales durante los ensayos.
 5. Entrar como estudiante autorizado, guardar fortalezas y Punto Cero en Workbook, recargar y verificar persistencia.
 6. Enviar dos mensajes a Cerebro de Mercado y comprobar que el segundo conserva el contexto.
+6a. Entrar a Agente de Contenido; comprobar los modos Pilares, Publicaciones y Sistema 90 días. Verificar que cada conversación sea independiente y que el Workbook sí comparta Avatar, Pilares, Bio y Oferta.
+6b. Guardar resultados del agente explícitamente, recargar y verificar que sobreviven a un nuevo inicio de sesión. Probar bio de más de 150 caracteres (debe rechazarse).
 7. Elegir explícitamente "Guardar este Ángulo en mi Workbook", recargar y comprobar persistencia.
 8. Probar acceso con otra cuenta inscrita y verificar que no pueda ver ni modificar el Workbook de la anterior.
 9. Entrar con una cuenta no inscrita: debe recibir denegación de acceso. Probar además token ausente y email admin no verificado.
@@ -46,4 +48,4 @@ Revertir publicación de frontend/backend si hay errores; revisar por separado q
 
 ## Siguientes mejoras
 
-Integración con compras Hotmart/GHL, desbloqueos por lección, diagnósticos Ruta Cero, extracción estructurada con confirmación, panel de mentor y agentes 2–8 de la guía de seis semanas.
+Integración con compras Hotmart/GHL, desbloqueos por lección, diagnósticos Ruta Cero, extracción estructurada con confirmación, panel de mentor y agentes 3–8 de la guía de seis semanas. El siguiente agente es Constructor de Oferta, cuya regla de bandas de precio requiere pruebas de cumplimiento antes de habilitarlo.
