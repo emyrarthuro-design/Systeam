@@ -7,9 +7,10 @@ import {
 } from 'lucide-react';
 import { auth } from '../lib/firebase';
 import { useAuth } from '../components/AuthProvider';
+import RutaCeroOfferEditor from '../components/RutaCeroOfferEditor';
 
 type Message = { role: 'user' | 'assistant'; content: string };
-type AgentId = 'cerebro-mercado' | 'contenido';
+type AgentId = 'cerebro-mercado' | 'contenido' | 'oferta';
 type ContentMode = 'pilares' | 'publicaciones' | 'sistema90';
 type Workbook = {
   fortalezas?: string;
@@ -22,6 +23,7 @@ type Workbook = {
   bio?: string;
   publicaciones?: string;
   ofertaLowTicket?: string;
+  ofertaSiguienteNivel?: string;
   sistemaContenido90?: string;
 };
 
@@ -36,7 +38,7 @@ const agents = [
     detail: 'Pilares, bio, publicaciones y un sistema de 90 días.',
     week: 'Semanas 2 y 6', available: true
   },
-  { id: 'oferta', name: 'Constructor de Oferta', detail: 'Low Ticket y Siguiente Nivel.', week: 'Semana 3', available: false },
+  { id: 'oferta', name: 'Constructor de Oferta', detail: 'Low Ticket validado y Siguiente Nivel.', week: 'Semana 3', available: true },
   { id: 'clase', name: 'Diseñador de Clase', detail: 'Tu clase gratuita de venta.', week: 'Semana 4', available: false },
   { id: 'semilla', name: 'Agente de Lanzamiento Semilla', detail: 'Captación y audios de lanzamiento.', week: 'Semana 4', available: false },
   { id: 'objeciones', name: 'Práctica de Objeciones', detail: 'Ensaya conversaciones de venta.', week: 'Semana 5', available: false },
@@ -54,7 +56,8 @@ const greetings: Record<string, string> = {
   'cerebro-mercado': 'Hola, soy tu Cerebro de Mercado de Ruta Cero de Systeam. Cuéntame tus 2-3 fortalezas finalistas y, si quieres, tu Punto Cero. Vamos a encontrar tu Ángulo de Oportunidad.',
   'contenido-pilares': 'Hola, soy tu Agente de Contenido. Estamos en modo Pilares. ¿Cuáles son los 3-4 temas que validaste en clase y cuál es tu Avatar?',
   'contenido-publicaciones': 'Hola, soy tu Agente de Contenido. Vamos con tu Bio y Publicaciones. ¿Cuál es tu Avatar, tu tono y qué ideas quieres convertir en publicaciones?',
-  'contenido-sistema90': 'Hola, soy tu Agente de Contenido. Vamos a construir un sistema de 90 días sostenible con tu Avatar, tu Low Ticket y tus Pilares.'
+  'contenido-sistema90': 'Hola, soy tu Agente de Contenido. Vamos a construir un sistema de 90 días sostenible con tu Avatar, tu Low Ticket y tus Pilares.',
+  'oferta': 'Hola, soy tu Constructor de Oferta de Ruta Cero. Necesito tu Avatar, tu Ángulo de Oportunidad y saber si ya has vendido antes. Armaremos tu Low Ticket y después tu Siguiente Nivel.'
 };
 
 const fields: Array<{ key: keyof Workbook; label: string; hint: string; max: number; group: string }> = [
@@ -67,7 +70,8 @@ const fields: Array<{ key: keyof Workbook; label: string; hint: string; max: num
   { key: 'ideasContenido', label: 'Ideas por pilar', hint: 'Guarda el resultado del modo Pilares.', max: 10000, group: 'Marca y contenido' },
   { key: 'bio', label: 'Bio de marca', hint: 'Máximo 150 caracteres para la bio final.', max: 150, group: 'Marca y contenido' },
   { key: 'publicaciones', label: 'Publicaciones', hint: 'Guarda aquí tus copies y la bio generada.', max: 12000, group: 'Marca y contenido' },
-  { key: 'ofertaLowTicket', label: 'Oferta Low Ticket', hint: 'Producto validado, útil para planificar el Sistema 90 días.', max: 3500, group: 'Oferta y plan 90 días' },
+  { key: 'ofertaLowTicket', label: 'Oferta Low Ticket validada', hint: 'Se guarda desde Constructor de Oferta; no se edita aquí.', max: 5000, group: 'Oferta y plan 90 días' },
+  { key: 'ofertaSiguienteNivel', label: 'Oferta de Siguiente Nivel validada', hint: 'Se guarda desde Constructor de Oferta; no se edita aquí.', max: 3500, group: 'Oferta y plan 90 días' },
   { key: 'sistemaContenido90', label: 'Sistema de contenido de 90 días', hint: 'Frecuencia, temas y formatos sostenibles.', max: 14000, group: 'Oferta y plan 90 días' }
 ];
 
@@ -97,17 +101,18 @@ export default function RutaCero() {
   const [allowed, setAllowed] = useState(false);
   const [workbook, setWorkbook] = useState<Workbook>({});
   const [savedWorkbook, setSavedWorkbook] = useState<Workbook>({});
+  const [offers, setOffers] = useState<{ lowTicket?: Record<string, any> | null; siguienteNivel?: Record<string, any> | null }>({});
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'chat' | 'workbook'>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'workbook' | 'offers'>('chat');
   const [enrollEmail, setEnrollEmail] = useState('');
   const bottom = useRef<HTMLDivElement>(null);
 
-  const conversationKey = agentId === 'cerebro-mercado' ? agentId : 'contenido-' + contentMode;
+  const conversationKey = agentId === 'contenido' ? 'contenido-' + contentMode : agentId === 'oferta' ? 'constructor-oferta' : agentId;
   const activeAgent = agents.find(a => a.id === agentId)!;
   const activeMode = modes.find(m => m.id === contentMode)!;
 
@@ -125,6 +130,7 @@ export default function RutaCero() {
       setAllowed(true);
       setWorkbook(data.workbook || {});
       setSavedWorkbook(data.workbook || {});
+      setOffers(data.offers || {});
       setMessages(data.messages || []);
     }).catch((e: Error) => {
       if (!active) return;
@@ -249,7 +255,7 @@ export default function RutaCero() {
         <p className="text-slate-400 mt-2 text-sm">Tus asistentes, conversaciones y ejercicios en un solo lugar.</p>
       </div>
       <span className="border border-amber-500/30 bg-amber-500/10 text-amber-400 rounded-full text-xs font-bold px-4 py-2">
-        MVP · 2 asistentes
+        MVP · 3 asistentes
       </span>
     </div>
 
@@ -312,6 +318,10 @@ export default function RutaCero() {
               (activeTab === 'workbook' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:bg-slate-800')}>
               <BookOpen size={16}/> Mi Workbook
             </button>
+            {agentId === 'oferta' && <button onClick={() => setActiveTab('offers')} className={'px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 ' +
+              (activeTab === 'offers' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:bg-slate-800')}>
+              <BookOpen size={16}/> Mis ofertas
+            </button>}
           </div>
 
           {activeTab === 'chat' ? <>
@@ -347,6 +357,10 @@ export default function RutaCero() {
                       className="mt-3 flex items-center gap-2 text-amber-400 hover:text-amber-300 font-bold text-xs disabled:opacity-50">
                       <BookOpen size={14}/> Guardar este resultado en mi Workbook
                     </button>}
+                  {m.role === 'assistant' && agentId === 'oferta' && <button type="button" onClick={() => setActiveTab('offers')}
+                    className="mt-3 flex items-center gap-2 text-amber-400 hover:text-amber-300 font-bold text-xs">
+                    <BookOpen size={14}/> Revisar y guardar mi propuesta
+                  </button>}
                 </div>
               </div>)}
               {busy && <span className="text-xs text-slate-500">El asistente está elaborando una respuesta…</span>}
@@ -361,7 +375,16 @@ export default function RutaCero() {
                 className="bg-amber-500 text-black rounded-xl p-3 disabled:opacity-40"><ArrowUp size={20}/></button>
             </form>
             <p className="px-5 pb-4 text-[11px] text-slate-500">Esta versión no realiza búsquedas web. Valida las referencias y guarda sólo resultados que hayas revisado.</p>
-          </> : <div className="p-5 md:p-7 space-y-6">
+          </> : activeTab === 'offers' && agentId === 'oferta' ? <RutaCeroOfferEditor
+            api={api}
+            offers={offers}
+            lastAssistantReply={messages.slice().reverse().find(m => m.role === 'assistant')?.content}
+            onSaved={data => {
+              setOffers(data.offers || {});
+              setWorkbook(prev => ({ ...prev, ...data.workbook }));
+              setSavedWorkbook(prev => ({ ...prev, ...data.workbook }));
+            }}
+          /> : <div className="p-5 md:p-7 space-y-6">
             <div>
               <h2 className="font-bold text-xl">Mi Workbook</h2>
               <p className="text-sm text-slate-400 mt-1">Tus avances alimentan los próximos ejercicios de Ruta Cero.</p>
@@ -372,6 +395,7 @@ export default function RutaCero() {
                 <span className="block font-bold text-sm mb-1">{field.label}</span>
                 <span className="block text-xs text-slate-400 mb-2">{field.hint}</span>
                 <textarea value={workbook[field.key] || ''} maxLength={field.max}
+                  readOnly={field.key === 'ofertaLowTicket' || field.key === 'ofertaSiguienteNivel'}
                   onChange={e => { setWorkbook(old => ({ ...old, [field.key]: e.target.value })); setSuccess(''); }}
                   rows={field.key === 'ideasContenido' || field.key === 'publicaciones' || field.key === 'sistemaContenido90' ? 6 : 3}
                   className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-sm outline-none focus:border-amber-500 resize-y"/>
