@@ -5,6 +5,7 @@ import type { GoogleGenAI } from '@google/genai';
 import rateLimit from 'express-rate-limit';
 import { resolveAgent, WORKBOOK_FIELDS, type WorkbookField } from './rutaCeroAgents';
 import { OfferValidationError, validateLowTicket, validateNextLevel, formatLowTicket, formatNextLevel } from './rutaCeroOfferLogic';
+import { registerLearningRoutes } from './rutaCeroLearning';
 
 /**
  * Ruta Cero MVP: server-owned workbook + private conversations.
@@ -58,7 +59,7 @@ export function registerRutaCeroRoutes(app: Express, deps: Deps) {
     if (!userSnap.exists) throw new Error('AUTH');
     const email = (decoded.email || '').trim().toLowerCase();
     const adminUser = decoded.email_verified === true && deps.isAdminEmail(email);
-    return { uid: decoded.uid, email, adminUser, firestore };
+    return { uid: decoded.uid, email, emailVerified: decoded.email_verified === true, adminUser, firestore };
   }
 
   async function eligible(req: Request) {
@@ -69,6 +70,8 @@ export function registerRutaCeroRoutes(app: Express, deps: Deps) {
     }
     return identity;
   }
+
+  registerLearningRoutes(app, { caller, eligible, getFirebaseAdmin: deps.getFirebaseAdmin });
 
   // Private academic data is exposed only by authenticated, access-controlled endpoints.
   app.get('/api/ruta-cero/state', async (req, res) => {
