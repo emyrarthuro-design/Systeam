@@ -2,9 +2,9 @@ import dotenv from "dotenv";
 import { registerRutaCeroRoutes } from "./src/server/rutaCero";
 dotenv.config();
 import express from "express";
+import type { RequestHandler } from "express";
 import path from "path";
 import { GoogleGenAI, Type } from "@google/genai";
-import { createServer as createViteServer } from "vite";
 import fs from "fs";
 import admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -13,6 +13,10 @@ import rateLimit from 'express-rate-limit';
 // Read config for database ID
 const firebaseConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'firebase-applet-config.json'), 'utf-8'));
 const databaseId = firebaseConfig.firestoreDatabaseId || '(default)';
+const expectedProject = process.env.SYSTEAM_EXPECTED_FIREBASE_PROJECT;
+if (expectedProject && (firebaseConfig.projectId !== expectedProject || databaseId !== '(default)')) {
+  throw new Error('La configuración de Firebase no coincide con el destino de despliegue.');
+}
 
 let adminApp: admin.app.App | null = null;
 
@@ -27,14 +31,23 @@ function getFirebaseAdmin(): admin.app.App {
   
   const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!serviceAccountJson || serviceAccountJson === 'MY_FIREBASE_SERVICE_ACCOUNT_JSON') {
+    if (expectedProject) {
+      adminApp = admin.initializeApp({
+        projectId: expectedProject,
+        credential: admin.credential.applicationDefault(),
+      });
+      return adminApp;
+    }
     throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON not configured in environment');
   }
-  
   let serviceAccount;
   try {
     serviceAccount = JSON.parse(serviceAccountJson);
   } catch (e) {
     throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON');
+  }
+  if (expectedProject && serviceAccount.project_id !== expectedProject) {
+    throw new Error('La cuenta de servicio no pertenece al proyecto de despliegue.');
   }
   
   adminApp = admin.initializeApp({
@@ -43,6 +56,21 @@ function getFirebaseAdmin(): admin.app.App {
   
   return adminApp;
 }
+
+const requireStudentSession: RequestHandler = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    res.status(401).json({ details: 'Inicia sesión para continuar.' });
+    return;
+  }
+  try {
+    await getFirebaseAdmin().auth().verifyIdToken(authHeader.slice(7), true);
+  } catch {
+    res.status(401).json({ details: 'Inicia sesión nuevamente para continuar.' });
+    return;
+  }
+  next();
+};
 
 async function verifyAdminCaller(req: express.Request): Promise<{
   uid: string;
@@ -96,7 +124,7 @@ const invitationValidationLimiter = rateLimit({
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const port = Number(process.env.PORT || 3000);
 
   app.use(express.json());
 
@@ -342,7 +370,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/analyze", async (req, res) => {
+  app.post("/api/analyze", requireStudentSession, async (req, res) => {
     try {
       const { variables, affinityRank, textAnswers } = req.body;
       
@@ -381,7 +409,7 @@ ${textAnswers}
 
       const ai = getAI();
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-pro-preview",
+        model: process.env.SYSTEAM_DIAGNOSIS_GEMINI_MODEL || "gemini-3.1-pro-preview",
         contents: prompt,
         config: {
           systemInstruction: systemInstruction,
@@ -474,7 +502,7 @@ ${textAnswers}
     }
   });
 
-  app.post("/api/improve-text", async (req, res) => {
+  app.post("/api/improve-text", requireStudentSession, async (req, res) => {
     try {
       const { text } = req.body;
       if (!text || typeof text !== 'string') {
@@ -485,7 +513,7 @@ ${textAnswers}
 
       const ai = getAI();
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-pro-preview",
+        model: process.env.SYSTEAM_DIAGNOSIS_GEMINI_MODEL || "gemini-3.1-pro-preview",
         contents: text,
         config: {
           systemInstruction: systemInstruction,
@@ -509,6 +537,7 @@ ${textAnswers}
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -527,8 +556,8 @@ ${textAnswers}
     }
   }
 
-  app.listen(Number(PORT), "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT}`);
+  app.listen(port, process.env.HOST || "0.0.0.0", () => {
+    console.log(`Server running on port ${port}`);
   });
 }
 
