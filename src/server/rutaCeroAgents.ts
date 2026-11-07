@@ -13,7 +13,7 @@ export const WORKBOOK_FIELDS = {
   tonoArquetipo: 1800,
   pilares: 2500,
   ideasContenido: 10000,
-  bio: 500,
+  bio: 150,
   publicaciones: 12000,
   ofertaLowTicket: 3500,
   sistemaContenido90: 14000
