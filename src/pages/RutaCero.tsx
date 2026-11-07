@@ -200,8 +200,8 @@ export default function RutaCero() {
     }
     const patch: Record<string, string> = { [field]: value };
     if (agentId === 'contenido' && contentMode === 'publicaciones') {
-      const clean = reply.replace(/\\*\\*/g, '');
-      const bio = clean.match(/^\\s*BIO:\\s*(.+)$/im)?.[1]?.trim();
+      const clean = reply.replace(/\*\*/g, '');
+      const bio = clean.match(/^\s*BIO:\s*(.+)$/im)?.[1]?.trim();
       if (bio && bio.length <= 150) patch.bio = bio;
     }
     setSaving(true); setError(''); setSuccess('');
