@@ -16,6 +16,7 @@ function buildStore() {
     ['users/beta', { uid: 'beta', email: 'beta@example.test', role: 'student' }],
     ['users/admin', { uid: 'admin', email: 'verified-admin@example.test', role: 'admin' }],
     ['users/unverified', { uid: 'unverified', email: 'verified-admin@example.test', role: 'admin' }],
+    ['users/spoofed', { uid: 'spoofed', email: 'claimed@example.test', role: 'student' }],
     ['rutaCeroEnrollments/alpha', { uid: 'alpha', active: true, program: 'ruta-cero' }]
   ]);
   const collection = (path: string): any => ({
@@ -74,6 +75,17 @@ test('Ruta Cero API protege acceso, Workbook, chat y activación por cuenta', as
         verifyIdToken: async (token: string) => {
           if (!logins[token]) throw new Error('Invalid token');
           return logins[token];
+        },
+        getUser: async (uid: string) => {
+          const registered: Record<string, string> = {
+            alpha: 'alpha@example.test',
+            beta: 'beta@example.test',
+            admin: 'verified-admin@example.test',
+            unverified: 'verified-admin@example.test',
+            spoofed: 'actual@example.test'
+          };
+          if (!registered[uid]) throw new Error('No such auth user');
+          return { uid, email: registered[uid] };
         }
       })
     }) as any,
@@ -298,6 +310,12 @@ test('Ruta Cero API protege acceso, Workbook, chat y activación por cuenta', as
   await t.test('un usuario no verificado no puede activar a terceros', async () => {
     const x = await call('admin/enroll', 'unverified', { email: 'beta@example.test' });
     assert.equal(x.status, 403);
+  });
+  await t.test('rechaza inscripción si el perfil manipula el correo de Firebase Auth', async () => {
+    const forged = await call('admin/enroll', 'admin', { email: 'claimed@example.test' });
+    assert.equal(forged.status, 409);
+    assert.match(forged.payload.error, /no coincide/i);
+    assert.equal(store.records.has('rutaCeroEnrollments/spoofed'), false);
   });
   await t.test('el administrador verificado activa otra cuenta', async () => {
     const before = await call('state', 'beta');
