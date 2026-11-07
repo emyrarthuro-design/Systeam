@@ -65,7 +65,7 @@ const fields: Array<{ key: keyof Workbook; label: string; hint: string; max: num
   { key: 'tonoArquetipo', label: 'Tono y arquetipo', hint: 'Tu tono de voz y arquetipo de marca o cómo los describes.', max: 1800, group: 'Marca y contenido' },
   { key: 'pilares', label: 'Pilares temáticos', hint: 'Entre 3 y 4 temas validados en clase.', max: 2500, group: 'Marca y contenido' },
   { key: 'ideasContenido', label: 'Ideas por pilar', hint: 'Guarda el resultado del modo Pilares.', max: 10000, group: 'Marca y contenido' },
-  { key: 'bio', label: 'Bio de marca', hint: 'Máximo 150 caracteres para la bio final.', max: 500, group: 'Marca y contenido' },
+  { key: 'bio', label: 'Bio de marca', hint: 'Máximo 150 caracteres para la bio final.', max: 150, group: 'Marca y contenido' },
   { key: 'publicaciones', label: 'Publicaciones', hint: 'Guarda aquí tus copies y la bio generada.', max: 12000, group: 'Marca y contenido' },
   { key: 'ofertaLowTicket', label: 'Oferta Low Ticket', hint: 'Producto validado, útil para planificar el Sistema 90 días.', max: 3500, group: 'Oferta y plan 90 días' },
   { key: 'sistemaContenido90', label: 'Sistema de contenido de 90 días', hint: 'Frecuencia, temas y formatos sostenibles.', max: 14000, group: 'Oferta y plan 90 días' }
