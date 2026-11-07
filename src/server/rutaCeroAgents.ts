@@ -15,7 +15,7 @@ export const WORKBOOK_FIELDS = {
   ideasContenido: 10000,
   bio: 150,
   publicaciones: 12000,
-  ofertaLowTicket: 3500,
+  ofertaLowTicket: 5000,
   ofertaSiguienteNivel: 3500,
   sistemaContenido90: 14000
 } as const;
