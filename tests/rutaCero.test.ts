@@ -26,7 +26,12 @@ function buildStore() {
         set: async (data: RecordData, opts?: { merge?: boolean }) => {
           const previous = records.get(key) || {};
           records.set(key, opts?.merge
-            ? { ...previous, ...data, fields: { ...(previous.fields || {}), ...(data.fields || {}) } }
+            ? {
+                ...previous,
+                ...data,
+                fields: { ...(previous.fields || {}), ...(data.fields || {}) },
+                validatedOffers: { ...(previous.validatedOffers || {}), ...(data.validatedOffers || {}) }
+              }
             : data);
         },
         collection: (segment: string) => collection(key + '/' + segment)
@@ -183,6 +188,108 @@ test('Ruta Cero API protege acceso, Workbook, chat y activación por cuenta', as
     assert.equal((await call('chat', 'alpha', { agentId: 'contenido', message: 'Hola' })).status, 400);
     assert.equal((await call('state?agentId=contenido&mode=cualquiera', 'alpha')).status, 400);
     assert.equal((await call('chat', 'alpha', { agentId: 'expansion', message: 'Hola' })).status, 400);
+  });
+  const lowOffer = {
+    name: 'Finanzas sin caos',
+    format: 'Taller online de 90 minutos',
+    includes: 'Sesión y plantilla descargable',
+    transformation: 'Un presupuesto mensual básico',
+    bonus: 'Guía para empezar sin conocimientos previos',
+    objection1: 'No tengo tiempo',
+    response1: 'Puedes usar la plantilla después del taller',
+    objection2: 'No sé de números',
+    response2: 'Empezamos con ejemplos sencillos',
+    price: 17
+  };
+  const nextOffer = {
+    name: 'Programa Finanzas Claras',
+    format: 'Acompañamiento en grupo',
+    includes: 'Cuatro encuentros de trabajo',
+    transformation: 'Crear un sistema de control mensual',
+    reason: 'Pasa del presupuesto inicial a un hábito sostenible',
+    price: 68
+  };
+
+  await t.test('no guarda ofertas sin Avatar y Ángulo de Oportunidad', async () => {
+    const result = await call('offers', 'alpha', { stage: 'lowTicket', experience: 'first', offer: lowOffer });
+    assert.equal(result.status, 422);
+    assert.match(result.payload.error, /Avatar/);
+  });
+  await t.test('el Workbook no permite saltarse la validación de precios', async () => {
+    const result = await call('workbook', 'alpha', { fields: { ofertaLowTicket: 'Low Ticket: $5000' } });
+    assert.equal(result.status, 400);
+    const next = await call('workbook', 'alpha', { fields: { ofertaSiguienteNivel: 'Precio: $1' } });
+    assert.equal(next.status, 400);
+  });
+  await t.test('rechaza Siguiente Nivel antes de validar Low Ticket', async () => {
+    const result = await call('offers', 'alpha', { stage: 'siguienteNivel', offer: nextOffer });
+    assert.equal(result.status, 422);
+    assert.match(result.payload.error, /Low Ticket/);
+  });
+  await t.test('primera venta rechaza precio fuera de USD $7–27', async () => {
+    await call('workbook', 'alpha', { fields: {
+      avatar: 'Freelancers con dificultad para administrar ingresos',
+      anguloOportunidad: 'Ayudo a freelancers a organizar sus finanzas con plantillas sencillas'
+    } });
+    for (const price of [0, 6.99, 27.01, 100, 17.123, NaN]) {
+      const result = await call('offers', 'alpha', { stage: 'lowTicket', experience: 'first', offer: { ...lowOffer, price } });
+      assert.equal(result.status, 422, String(price));
+    }
+    const unknown = await call('offers', 'alpha', { stage: 'lowTicket', experience: 'unknown', offer: lowOffer });
+    assert.equal(unknown.status, 422);
+  });
+  await t.test('primera venta acepta USD $7 y $27 y guarda un resumen canónico', async () => {
+    for (const price of [7, 27]) {
+      const result = await call('offers', 'alpha', { stage: 'lowTicket', experience: 'first', offer: { ...lowOffer, price } });
+      assert.equal(result.status, 200);
+      assert.equal(result.payload.offers.lowTicket.price, price);
+      assert.match(result.payload.workbook.ofertaLowTicket, /LOW TICKET — OFERTA VALIDADA/);
+    }
+  });
+  await t.test('Siguiente Nivel respeta múltiplo 3–10 y guarda solo después', async () => {
+    const tooLow = await call('offers', 'alpha', { stage: 'siguienteNivel', offer: { ...nextOffer, price: 80.72 } });
+    assert.equal(tooLow.status, 422); // 27 * 3 = 81
+    const tooHigh = await call('offers', 'alpha', { stage: 'siguienteNivel', offer: { ...nextOffer, price: 270.01 } });
+    assert.equal(tooHigh.status, 422);
+    for (const price of [81, 270]) {
+      const result = await call('offers', 'alpha', { stage: 'siguienteNivel', offer: { ...nextOffer, price } });
+      assert.equal(result.status, 200);
+      assert.equal(result.payload.offers.siguienteNivel.price, price);
+      assert.equal(result.payload.offers.siguienteNivel.basedOnLowTicketPrice, 27);
+    }
+    const state = await call('state?agentId=oferta', 'alpha');
+    assert.equal(state.status, 200);
+    assert.match(state.payload.workbook.ofertaSiguienteNivel, /SIGUIENTE NIVEL — OFERTA VALIDADA/);
+  });
+  await t.test('reprecio de Low Ticket invalida Siguiente Nivel previamente aprobado', async () => {
+    const revised = await call('offers', 'alpha', { stage: 'lowTicket', experience: 'first', offer: { ...lowOffer, price: 17 } });
+    assert.equal(revised.status, 200);
+    assert.equal(revised.payload.offers.siguienteNivel, null);
+    assert.equal(revised.payload.workbook.ofertaSiguienteNivel, '');
+  });
+  await t.test('vendedor experimentado respeta USD $27–100', async () => {
+    for (const price of [26.99, 100.01]) {
+      const result = await call('offers', 'alpha', { stage: 'lowTicket', experience: 'experienced', offer: { ...lowOffer, price } });
+      assert.equal(result.status, 422);
+    }
+    for (const price of [27, 100]) {
+      const result = await call('offers', 'alpha', { stage: 'lowTicket', experience: 'experienced', offer: { ...lowOffer, price } });
+      assert.equal(result.status, 200);
+      assert.equal(result.payload.offers.lowTicket.experience, 'experienced');
+    }
+  });
+  await t.test('Constructor de Oferta comparte los antecedentes pero no los mensajes de otros agentes', async () => {
+    const response = await call('chat', 'alpha', { agentId: 'oferta', message: 'Estoy diseñando mi primer taller' });
+    assert.equal(response.status, 200);
+    assert.equal(response.payload.messages.length, 2);
+    const state = await call('state?agentId=oferta', 'alpha');
+    assert.equal(state.payload.messages.length, 2);
+    assert.match(state.payload.workbook.ofertaLowTicket, /100.00 USD/);
+    const market = await call('state', 'alpha');
+    assert.equal(market.payload.messages.length, 2);
+    const lastAI = aiCalls.at(-1) as any;
+    assert.match(lastAI.config.systemInstruction, /entre USD \$7 y \$27/);
+    assert.match(lastAI.contents[0].parts[0].text, /freelancers/i);
   });
   await t.test('no permite usar agentes todavía bloqueados', async () => {
     const x = await call('chat', 'alpha', { agentId: 'constructor-oferta', message: 'Ayúdame' });
