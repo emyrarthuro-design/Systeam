@@ -8,7 +8,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import fs from "fs";
 import admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 // Read config for database ID
 const firebaseConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'firebase-applet-config.json'), 'utf-8'));
@@ -85,7 +85,7 @@ async function verifyAdminCaller(req: express.Request): Promise<{
   
   const idToken = authHeader.substring(7);
   const adminInstance = getFirebaseAdmin();
-  const decoded = await adminInstance.auth().verifyIdToken(idToken);
+  const decoded = await adminInstance.auth().verifyIdToken(idToken, true);
   
   const email = (decoded.email || '').toLowerCase();
   if (!decoded.email_verified) throw new Error('FORBIDDEN: Admin email is not verified');
@@ -117,14 +117,13 @@ const invitationValidationLimiter = rateLimit({
     error: 'Demasiados intentos. Espera un minuto antes de volver a intentar.',
     retryAfter: 60
   },
-  keyGenerator: (req) => {
-    return (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || req.ip || 'unknown';
-  }
+  keyGenerator: req => ipKeyGenerator(req.ip || req.socket.remoteAddress || 'unknown')
 });
 
 async function startServer() {
   const app = express();
   const port = Number(process.env.PORT || 3000);
+  if (expectedProject && process.env.K_SERVICE) app.set('trust proxy', 1);
 
   app.use(express.json());
 
