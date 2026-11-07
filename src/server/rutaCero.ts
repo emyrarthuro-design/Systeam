@@ -185,6 +185,18 @@ export function registerRutaCeroRoutes(app: Express, deps: Deps) {
       const users = await firestore.collection('users').where('email', '==', email).limit(2).get();
       if (users.size !== 1) return res.status(404).json({ error: 'No se encontró un estudiante con ese correo en Systeam.' });
       const userDoc = users.docs[0];
+      // The user profile is writable in part by its owner. Verify enrollment
+      // against Firebase Auth, which owns the actual email <-> uid mapping.
+      const sdk = deps.getFirebaseAdmin();
+      let targetAuth;
+      try {
+        targetAuth = await sdk.auth().getUser(userDoc.id);
+      } catch {
+        return res.status(404).json({ error: 'No se encontró una cuenta activa de Firebase Auth para ese perfil.' });
+      }
+      if ((targetAuth.email || '').trim().toLowerCase() !== email) {
+        return res.status(409).json({ error: 'El correo del perfil no coincide con Firebase Auth. Revisa el registro antes de activarlo.' });
+      }
       await firestore.collection('rutaCeroEnrollments').doc(userDoc.id).set({
         uid: userDoc.id,
         email,
