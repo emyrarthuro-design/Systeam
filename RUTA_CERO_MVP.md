@@ -5,9 +5,9 @@ Esta rama añade un módulo independiente a la plataforma Systeam existente. No 
 ## Incluido
 
 - Ruta protegida: `/ruta-cero`, accesible después de iniciar sesión.
-- Ocho asistentes identificados según la **guía actualizada de seis semanas**. **Cerebro de Mercado** y **Agente de Contenido** tienen motores conversacionales; los otros seis están identificados como próximos.
-- Conversaciones por UID del estudiante y por agente/modo; Agente de Contenido tiene los modos **Pilares**, **Publicaciones** y **Sistema de 90 días**.
-- Workbook compartido con `fortalezas`, `puntoCero`, `anguloOportunidad`, `avatar`, `tonoArquetipo`, `pilares`, `ideasContenido`, `bio` (máximo 150 caracteres), `publicaciones`, `ofertaLowTicket` y `sistemaContenido90`. Los resultados solo se guardan por acción explícita del estudiante.
+- Ocho asistentes identificados según la **guía actualizada de seis semanas**. **Cerebro de Mercado**, **Agente de Contenido** y **Constructor de Oferta** tienen motores conversacionales; los otros cinco están identificados como próximos.
+- Conversaciones por UID del estudiante y por agente/modo; Agente de Contenido tiene los modos **Pilares**, **Publicaciones** y **Sistema de 90 días**. Constructor de Oferta trabaja en dos etapas: Low Ticket y Siguiente Nivel.
+- Workbook compartido con `fortalezas`, `puntoCero`, `anguloOportunidad`, `avatar`, `tonoArquetipo`, `pilares`, `ideasContenido`, `bio` (máximo 150 caracteres), `publicaciones`, `ofertaLowTicket`, `ofertaSiguienteNivel` y `sistemaContenido90`. Los resultados solo se guardan por acción explícita del estudiante.
 - API de acceso por token de Firebase y verificación de inscripción activa.
 - Herramienta básica de activación por correo para administradores, disponible desde Ruta Cero.
 
@@ -17,6 +17,8 @@ Esta rama añade un módulo independiente a la plataforma Systeam existente. No 
 - `rutaCeroWorkbooks/{uid}`: `fields`, `updatedAt`.
 - `rutaCeroConversations/{uid}/agents/cerebro-mercado`: `messages`, `updatedAt`.
 - `rutaCeroConversations/{uid}/agents/contenido-pilares`, `contenido-publicaciones`, `contenido-sistema90`: conversaciones aisladas entre modos.
+- `rutaCeroConversations/{uid}/agents/constructor-oferta`: historial del Constructor de Oferta.
+- `rutaCeroWorkbooks/{uid}.validatedOffers`: fichas estructuradas del Low Ticket y Siguiente Nivel validadas en servidor, además del resumen en texto.
 
 Las colecciones nuevas **no se añaden a las reglas públicas de Firestore** y están denegadas por la regla catch-all existente. Solamente el servidor, previa autenticación y validación de inscripción, accede a ellas usando Firebase Admin SDK.
 
@@ -36,7 +38,8 @@ Nunca almacenes claves en el frontend ni en el repositorio.
 6. Confirmar que los contenidos anteriores de diagnóstico y clases no se modificaron.
 7. Revisar coste, límites de uso, política de datos y capacidad antes de habilitar la primera cohorte.
 8. No atribuir búsqueda web a ninguno de los dos agentes. Cerebro de Mercado entrega orientación general; la búsqueda verificable queda para una iteración posterior.
-9. El MVP no implementa todavía desbloqueos por lección o semana: ambas funciones aparecen al estudiante activado. No comunicar como producción académica hasta definir el calendario de apertura.
+9. El MVP no implementa todavía desbloqueos por lección o semana: los tres agentes aparecen al estudiante activado. No comunicar como producción académica hasta definir el calendario de apertura.
+10. Constructor de Oferta: comprobar los dos rangos estrictos de Low Ticket ($7–27 primera venta; $27–100 con experiencia) y la relación de 3–10 veces para Siguiente Nivel. No permitir guardar oferta 2 sin oferta 1 validada.
 
 ## Próxima iteración
 
@@ -45,6 +48,7 @@ Nunca almacenes claves en el frontend ni en el repositorio.
 - Cerebro de Mercado con herramienta de búsqueda web y citas de fuentes verificables.
 - Panel de progreso para mentoría, integración de compras Hotmart/GHL y activación automática únicamente por compra validada.
 - Política de retención de conversaciones, exportación y borrado por estudiante.
+- QA pedagógico de respuestas generadas por Gemini y no solo validación del guardado estructurado. Los precios en propuestas de chat deben revisarse antes de validar la oferta.
 
 **Alcance**: implementación inicial para revisión; no se declara lista para producción hasta superar pruebas y despliegue.
 
