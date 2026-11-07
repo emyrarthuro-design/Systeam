@@ -156,7 +156,7 @@ export default function RutaCeroOfferEditor({ offers, lastAssistantReply = '', a
         : 'Primero selecciona tu experiencia para conocer el rango permitido.'}</p>
     </div>}
     {stage === 'siguienteNivel' && <p className="text-amber-400 bg-amber-500/10 border border-amber-500/25 p-3 rounded-lg text-xs">
-      Tu Low Ticket validado cuesta ${lowPrice.toFixed(2)} USD. El Siguiente Nivel debe costar entre $${(lowPrice * 3).toFixed(2)} y $${(lowPrice * 10).toFixed(2)} USD.
+      Tu Low Ticket validado cuesta ${lowPrice.toFixed(2)} USD. El Siguiente Nivel debe costar entre ${(lowPrice * 3).toFixed(2)} y ${(lowPrice * 10).toFixed(2)} USD.
     </p>}
 
     {lastAssistantReply && <button type="button" onClick={() => {
