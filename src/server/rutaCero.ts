@@ -4,6 +4,7 @@ import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import type { GoogleGenAI } from '@google/genai';
 import rateLimit from 'express-rate-limit';
 import { resolveAgent, WORKBOOK_FIELDS, type WorkbookField } from './rutaCeroAgents';
+import { OfferValidationError, validateLowTicket, validateNextLevel, formatLowTicket, formatNextLevel } from './rutaCeroOfferLogic';
 
 /**
  * Ruta Cero MVP: server-owned workbook + private conversations.
@@ -26,6 +27,7 @@ function statusFor(error: unknown): number {
   if (value === 'AUTH') return 401;
   if (value === 'ACCESS') return 403;
   if (value === 'INVALID') return 400;
+  if (error instanceof OfferValidationError) return 422;
   return 500;
 }
 function safeError(error: unknown) {
@@ -33,6 +35,7 @@ function safeError(error: unknown) {
   if (code === 401) return 'Inicia sesión nuevamente para continuar.';
   if (code === 403) return 'Tu acceso a Ruta Cero aún no está activado.';
   if (code === 400) return 'Revisa la información enviada.';
+  if (error instanceof OfferValidationError) return error.message;
   console.error('[RUTA-CERO] Error:', error);
   return 'No fue posible completar la operación. Intenta nuevamente.';
 }
@@ -82,6 +85,7 @@ export function registerRutaCeroRoutes(app: Express, deps: Deps) {
         agentId: agent.agentId,
         mode: agent.mode || null,
         workbook: workbook.data()?.fields || {},
+        offers: workbook.data()?.validatedOffers || {},
         messages: conversation.data()?.messages || []
       });
     } catch (error) {
@@ -95,7 +99,10 @@ export function registerRutaCeroRoutes(app: Express, deps: Deps) {
       const fields = req.body?.fields;
       if (!fields || typeof fields !== 'object' || Array.isArray(fields)) throw new Error('INVALID');
       const keys = Object.keys(fields);
-      if (!keys.length || keys.some(key => !Object.prototype.hasOwnProperty.call(WORKBOOK_FIELDS, key))) {
+      if (!keys.length || keys.some(key =>
+        !Object.prototype.hasOwnProperty.call(WORKBOOK_FIELDS, key) ||
+        key === 'ofertaLowTicket' || key === 'ofertaSiguienteNivel'
+      )) {
         throw new Error('INVALID');
       }
       const clean: Record<string, string> = {};
@@ -111,6 +118,58 @@ export function registerRutaCeroRoutes(app: Express, deps: Deps) {
       }, { merge: true });
       const snap = await ref.get();
       return res.json({ workbook: snap.data()?.fields || {} });
+    } catch (error) {
+      return res.status(statusFor(error)).json({ error: safeError(error) });
+    }
+  });
+
+  // The AI may suggest prices; only this server-validated endpoint can
+  // persist academic offers. Raw workbook writes to these fields are blocked.
+  app.post('/api/ruta-cero/offers', async (req, res) => {
+    try {
+      const { uid, firestore } = await eligible(req);
+      const ref = firestore.collection('rutaCeroWorkbooks').doc(uid);
+      const snap = await ref.get();
+      const existing = snap.data() || {};
+      const fields = existing.fields || {};
+      const validatedOffers = existing.validatedOffers || {};
+      const stage = req.body?.stage;
+
+      if (stage === 'lowTicket') {
+        if (!String(fields.avatar || '').trim() || !String(fields.anguloOportunidad || '').trim()) {
+          throw new OfferValidationError('Guarda primero tu Avatar y tu Ángulo de Oportunidad en el Workbook.');
+        }
+        const offer = validateLowTicket(req.body?.offer, req.body?.experience);
+        await ref.set({
+          uid,
+          fields: {
+            ofertaLowTicket: formatLowTicket(offer),
+            ofertaSiguienteNivel: ''
+          },
+          validatedOffers: {
+            lowTicket: offer,
+            siguienteNivel: null
+          },
+          updatedAt: FieldValue.serverTimestamp()
+        }, { merge: true });
+      } else if (stage === 'siguienteNivel') {
+        // Existing validated Low Ticket is required for stage two.
+        const next = validateNextLevel(req.body?.offer, validatedOffers.lowTicket);
+        await ref.set({
+          uid,
+          fields: { ofertaSiguienteNivel: formatNextLevel(next) },
+          validatedOffers: { siguienteNivel: next },
+          updatedAt: FieldValue.serverTimestamp()
+        }, { merge: true });
+      } else {
+        throw new Error('INVALID');
+      }
+
+      const updated = await ref.get();
+      return res.json({
+        workbook: updated.data()?.fields || {},
+        offers: updated.data()?.validatedOffers || {}
+      });
     } catch (error) {
       return res.status(statusFor(error)).json({ error: safeError(error) });
     }
