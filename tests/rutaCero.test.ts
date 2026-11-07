@@ -136,6 +136,54 @@ test('Ruta Cero API protege acceso, Workbook, chat y activación por cuenta', as
     const state = await call('state', 'alpha');
     assert.equal(state.payload.messages.length, 2);
   });
+  await t.test('Agente de Contenido usa avatar y pilares del Workbook', async () => {
+    const saved = await call('workbook', 'alpha', {
+      fields: { avatar: 'Freelancers con dificultad para organizar sus finanzas', pilares: 'Finanzas personales, presupuestos, ahorro' }
+    });
+    assert.equal(saved.status, 200);
+    const response = await call('chat', 'alpha', {
+      agentId: 'contenido', mode: 'pilares', message: 'Ayúdame con cuatro ideas por pilar'
+    });
+    assert.equal(response.status, 200);
+    assert.equal(response.payload.messages.length, 2);
+    const lastAI = aiCalls.at(-1) as any;
+    assert.match(lastAI.config.systemInstruction, /EXACTAMENTE 4 ideas/);
+    const firstContext = lastAI.contents[0].parts[0].text;
+    assert.match(firstContext, /Freelancers con dificultad/);
+    assert.match(firstContext, /Finanzas personales/);
+  });
+  await t.test('los modos de Contenido guardan conversaciones separadas entre sí', async () => {
+    const pillars = await call('state?agentId=contenido&mode=pilares', 'alpha');
+    assert.equal(pillars.status, 200);
+    assert.equal(pillars.payload.messages.length, 2);
+    const postsBefore = await call('state?agentId=contenido&mode=publicaciones', 'alpha');
+    assert.equal(postsBefore.payload.messages.length, 0);
+    const response = await call('chat', 'alpha', {
+      agentId: 'contenido', mode: 'publicaciones', message: 'Quiero una bio para mi marca'
+    });
+    assert.equal(response.status, 200);
+    const postsAfter = await call('state?agentId=contenido&mode=publicaciones', 'alpha');
+    assert.equal(postsAfter.payload.messages.length, 2);
+    const ninety = await call('state?agentId=contenido&mode=sistema90', 'alpha');
+    assert.equal(ninety.payload.messages.length, 0);
+    const market = await call('state', 'alpha');
+    assert.equal(market.payload.messages.length, 2);
+  });
+  await t.test('agente de Contenido mantiene entregables compartidos en Workbook', async () => {
+    const result = await call('workbook', 'alpha', {
+      fields: { ideasContenido: 'EDUCA: Cómo organizar finanzas; CONECTA: Mi experiencia', publicaciones: 'BIO: Ayudo a freelancers a organizar sus finanzas.' }
+    });
+    assert.equal(result.status, 200);
+    const state = await call('state?agentId=contenido&mode=sistema90', 'alpha');
+    assert.match(state.payload.workbook.ideasContenido, /EDUCA/);
+    assert.match(state.payload.workbook.publicaciones, /BIO/);
+    assert.equal(state.payload.workbook.fortalezas, 'Comunicación, orden y estrategia');
+  });
+  await t.test('rechaza modo no reconocido, modo ausente y otro agente no implementado', async () => {
+    assert.equal((await call('chat', 'alpha', { agentId: 'contenido', message: 'Hola' })).status, 400);
+    assert.equal((await call('state?agentId=contenido&mode=cualquiera', 'alpha')).status, 400);
+    assert.equal((await call('chat', 'alpha', { agentId: 'expansion', message: 'Hola' })).status, 400);
+  });
   await t.test('no permite usar agentes todavía bloqueados', async () => {
     const x = await call('chat', 'alpha', { agentId: 'constructor-oferta', message: 'Ayúdame' });
     assert.equal(x.status, 400);
