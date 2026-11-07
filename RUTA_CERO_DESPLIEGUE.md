@@ -51,3 +51,27 @@ Revertir publicación de frontend/backend si hay errores; revisar por separado q
 ## Siguientes mejoras
 
 Integración con compras Hotmart/GHL, desbloqueos por lección, diagnósticos Ruta Cero, panel de mentor y agentes 4–8 de la guía de seis semanas. Los tres primeros agentes están implementados en la rama, pendientes de prueba real con los servicios y aprobación académica antes de activar estudiantes.
+
+
+## Validación adicional de seguridad — sin acceso a producción
+
+Se añadió una prueba de reglas con Firebase Local Emulator Suite usando exclusivamente un proyecto ficticio con prefijo `demo-`. Esta prueba busca detectar:
+- Autoasignación de roles administrativos en `users/{uid}`.
+- Modificación de los campos `email` y `uid` del propio perfil.
+- Lectura de perfiles ajenos por estudiantes.
+- Acceso directo desde cliente a `rutaCeroEnrollments`, `rutaCeroWorkbooks` y `rutaCeroConversations`.
+- Permisos de administración para correos sin verificación.
+
+El servidor ahora verifica contra Firebase Authentication la correspondencia entre UID y correo al activar alumnos; el campo editable de un perfil no es una prueba suficiente de identidad. Las pruebas automáticas de la API contemplan perfiles con correos manipulados.
+
+**La ejecución del emulador no constituye una prueba de las reglas ya publicadas**, ni verifica una cuenta de Firebase o Cloud Run real. Una persona autorizada debe conectar el proyecto correcto, confirmar que se trata de staging, revisar la política vigente y aplicar las reglas mediante el procedimiento de despliegue adecuado.
+
+### Acciones que requieren acceso autenticado del propietario
+
+- Conectar el plugin oficial de Firebase en ChatGPT; esta conexión no se puede crear automáticamente desde GitHub ni por una sugerencia del asistente.
+- Restablecer la credencial administrativa previamente expuesta en el código histórico y revocar sesiones no reconocidas.
+- Revisar en Firebase Auth la verificación de correos administrativos, usuarios privilegiados y registros anómalos.
+- Crear o seleccionar un proyecto **de pruebas separado de producción** y configurar los secretos solo en ese entorno.
+- Validar en el entorno real acceso y persistencia de Workbook, conversación de cada agente, costes de Gemini y lectura/escritura bajo las reglas finales.
+
+**No fusionar la rama ni habilitar estudiantes hasta finalizar estas tareas.**
