@@ -22,8 +22,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Production dependency audit (block critical)
-        run: npm audit --omit=dev --audit-level=critical
+      - name: Production dependency audit (block high and critical)
+        run: npm audit --omit=dev --audit-level=high
       - name: TypeScript validation
         run: npm run lint
       - name: Ruta Cero API access and workbook tests
