@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Lock, AlertTriangle, Key } from 'lucide-react';
 import { SUPER_ADMIN_EMAILS, ADMIN_EMAILS } from '../lib/admins';
 
-export default function Login() {
+export default function Login({ rutaCeroLogo }: { rutaCeroLogo?: string }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -40,7 +40,7 @@ export default function Login() {
         setError('Para acceder como administrador debes verificar el correo. Revisa tu bandeja y vuelve a iniciar sesión.');
         return;
       }
-      navigate(adminEmail ? '/admin' : '/diagnostico');
+      navigate(rutaCeroLogo ? '/' : adminEmail ? '/admin' : '/diagnostico', { replace: true });
     } catch (err: any) {
       if (import.meta.env.DEV) console.error('Error iniciando sesión', err);
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
@@ -91,10 +91,13 @@ export default function Login() {
             transition={{ duration: 0.8 }}
           >
             <div className="flex justify-center mb-8 w-full">
-              <span className="font-sans font-bold tracking-tight lowercase text-sys-text-main text-[40px] leading-none">
-                systeam<span className="text-sys-accent">.</span>
-              </span>
+              {rutaCeroLogo ? <img src={rutaCeroLogo} alt="Ruta Cero" className="w-60" /> : (
+                <span className="font-sans font-bold tracking-tight lowercase text-sys-text-main text-[40px] leading-none">
+                  systeam<span className="text-sys-accent">.</span>
+                </span>
+              )}
             </div>
+            {rutaCeroLogo && <p className="mb-6 text-center text-sm text-sys-text-sec">Portal del programa de seis semanas. Entra con tu cuenta de Systeam.</p>}
 
             <div className="card-geometric">
               {!showForgot ? (
@@ -230,7 +233,7 @@ export default function Login() {
             
             <div className="mt-8 text-center">
               <p className="text-sm text-sys-text-mut">
-                ¿No tienes cuenta? Tu acceso es por invitación.<br className="hidden md:block"/> Contacta a SysTeam.
+                {rutaCeroLogo ? '¿Te falta la inscripción? Contacta al equipo de Ruta Cero.' : <>¿No tienes cuenta? Tu acceso es por invitación.<br className="hidden md:block"/> Contacta a SysTeam.</>}
               </p>
             </div>
           </motion.div>

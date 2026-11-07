@@ -7,7 +7,6 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Activate from './pages/Activate';
 import Dashboard from './pages/Dashboard';
-import RutaCero from './pages/RutaCero';
 import DiagnosisFlow from './pages/DiagnosisFlow';
 import Results from './pages/Results';
 import Classes from './pages/Classes';
@@ -55,7 +54,6 @@ function AppContent() {
           <Route path="/resultados" element={<PrivateRoute><Results /></PrivateRoute>} />
           <Route path="/results" element={<Navigate to="/resultados" replace />} />
           <Route path="/clases" element={<PrivateRoute><Classes /></PrivateRoute>} />
-          <Route path="/ruta-cero" element={<PrivateRoute><RutaCero /></PrivateRoute>} />
           
           <Route path="/admin/*" element={
             <PrivateRoute adminOnly={true}>

@@ -14,6 +14,8 @@ import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 const firebaseConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'firebase-applet-config.json'), 'utf-8'));
 const databaseId = firebaseConfig.firestoreDatabaseId || '(default)';
 const expectedProject = process.env.SYSTEAM_EXPECTED_FIREBASE_PROJECT;
+const appKind = process.env.SYSTEAM_APP_KIND || 'systeam';
+if (appKind !== 'systeam' && appKind !== 'ruta-cero') throw new Error('Aplicación desconocida.');
 if (expectedProject && (firebaseConfig.projectId !== expectedProject || databaseId !== '(default)')) {
   throw new Error('La configuración de Firebase no coincide con el destino de despliegue.');
 }
@@ -124,8 +126,23 @@ async function startServer() {
   const app = express();
   const port = Number(process.env.PORT || 3000);
   if (expectedProject && process.env.K_SERVICE) app.set('trust proxy', 1);
+  if (appKind === 'systeam' && process.env.RUTA_CERO_PORTAL_URL) {
+    const portalUrl = new URL(process.env.RUTA_CERO_PORTAL_URL);
+    if (portalUrl.protocol !== 'https:' || portalUrl.username || portalUrl.password) {
+      throw new Error('La URL del portal Ruta Cero no es válida.');
+    }
+    app.get('/ruta-cero', (_req, res) => res.redirect(302, portalUrl.href));
+  }
 
   app.use(express.json());
+  app.use('/api', (req, res, next) => {
+    const isRutaCeroApi = /^\/ruta-cero(?:\/|$)/i.test(req.path);
+    if (isRutaCeroApi !== (appKind === 'ruta-cero')) {
+      res.status(404).json({ error: 'Ruta no disponible.' });
+      return;
+    }
+    next();
+  });
 
   app.get('/api/invitations/test-all', async (req, res) => {
     try {
@@ -527,7 +544,7 @@ ${textAnswers}
     }
   });
 
-  registerRutaCeroRoutes(app, {
+  if (appKind === 'ruta-cero') registerRutaCeroRoutes(app, {
     getFirebaseAdmin,
     getAI,
     databaseId,

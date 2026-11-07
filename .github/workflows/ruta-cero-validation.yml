@@ -30,6 +30,10 @@ jobs:
         run: npm run test:api
       - name: Production build
         run: npm run build
+      - name: Independent Ruta Cero build
+        env:
+          SYSTEAM_APP_KIND: ruta-cero
+        run: npm run build
       - name: Java for Firestore emulator
         uses: actions/setup-java@v4
         with:

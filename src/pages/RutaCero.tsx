@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import {
-  ArrowLeft, ArrowUp, BookOpen, Check, ChevronRight, LockKeyhole,
+  ArrowUp, BookOpen, Check, ChevronRight, LockKeyhole,
   MessageCircle, Save, Sparkles
 } from 'lucide-react';
 import { auth } from '../lib/firebase';
@@ -53,7 +52,7 @@ const modes = [
 ] as const;
 
 const greetings: Record<string, string> = {
-  'cerebro-mercado': 'Hola, soy tu Cerebro de Mercado de Ruta Cero de Systeam. Cuéntame tus 2-3 fortalezas finalistas y, si quieres, tu Punto Cero. Vamos a encontrar tu Ángulo de Oportunidad.',
+  'cerebro-mercado': 'Hola, soy tu Cerebro de Mercado de Ruta Cero. Cuéntame tus 2-3 fortalezas finalistas y, si quieres, tu Punto Cero. Vamos a encontrar tu Ángulo de Oportunidad.',
   'contenido-pilares': 'Hola, soy tu Agente de Contenido. Estamos en modo Pilares. ¿Cuáles son los 3-4 temas que validaste en clase y cuál es tu Avatar?',
   'contenido-publicaciones': 'Hola, soy tu Agente de Contenido. Vamos con tu Bio y Publicaciones. ¿Cuál es tu Avatar, tu tono y qué ideas quieres convertir en publicaciones?',
   'contenido-sistema90': 'Hola, soy tu Agente de Contenido. Vamos a construir un sistema de 90 días sostenible con tu Avatar, tu Low Ticket y tus Pilares.',
@@ -247,10 +246,7 @@ export default function RutaCero() {
   return <div className="w-full max-w-7xl mx-auto px-4 sm:px-8 py-8 md:py-12 text-white">
     <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
       <div>
-        <Link to="/diagnostico" className="text-xs text-slate-400 hover:text-white inline-flex gap-2 items-center mb-4">
-          <ArrowLeft size={14}/> Volver a mi espacio
-        </Link>
-        <p className="text-xs tracking-[0.3em] font-bold uppercase text-amber-500 mb-2">Systeam Global · Mentoría</p>
+        <p className="text-xs tracking-[0.3em] font-bold uppercase text-amber-500 mb-2">Programa de seis semanas</p>
         <h1 className="text-3xl md:text-5xl font-black tracking-tight">RUTA <span className="text-amber-500">CERO</span></h1>
         <p className="text-slate-400 mt-2 text-sm">Tus asistentes, conversaciones y ejercicios en un solo lugar.</p>
       </div>
@@ -264,7 +260,7 @@ export default function RutaCero() {
         <LockKeyhole size={32} className="text-amber-500 mb-4"/>
         <h2 className="text-xl font-bold mb-2">Acceso pendiente de activación</h2>
         <p className="text-slate-300 text-sm leading-relaxed mb-4">{error || 'Necesitas una inscripción activa a Ruta Cero.'}</p>
-        <p className="text-slate-500 text-sm">Solicita al equipo Systeam que active tu cuenta de estudiante.</p>
+        <p className="text-slate-500 text-sm">Solicita al equipo de Ruta Cero que active tu inscripción.</p>
         {isAdmin && <div className="mt-6 border-t border-slate-700 pt-5">
           <p className="text-xs text-amber-400 font-bold mb-3">Activación administrativa</p>
           <div className="flex gap-2 flex-wrap">
