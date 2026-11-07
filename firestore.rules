@@ -51,9 +51,12 @@ service cloud.firestore {
         );
       
       allow update: if isAuthenticated() && (
-        (request.auth.uid == userId && request.resource.data.role == resource.data.role) ||
+        // Self-service profile edits cannot rewrite identity or role metadata.
+        (request.auth.uid == userId
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.uid == resource.data.uid) ||
         isSuperAdmin() ||
-        (request.auth.uid == userId && request.auth.token.email == 'emyr.arthuro@gmail.com' && request.resource.data.role == 'super_admin') ||
         (isAdmin() && resource.data.role == 'student' && request.resource.data.role == 'student')
       );
       
