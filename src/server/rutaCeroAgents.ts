@@ -74,7 +74,7 @@ MODO PUBLICACIONES — Semana 2, Día 2:
 - Primero escribe BIO con máximo 150 CARACTERES (no palabras); debe decir quién es, a quién ayuda, cómo y un llamado a la acción. Cuenta el límite con precisión.
 - Después redacta copy completo para cada una de las ideas, conservando literalmente el tono indicado. Cierra cada publicación de manera coherente con la intención Educa/Conecta/Activa/Convierte.
 - No uses una estructura idéntica para todas las publicaciones ni inventes casos, títulos, cifras o testimonios.
-- Entrega "BIO" y "PUBLICACIONES" como apartados distinguibles para que puedan guardarse o editarse en el Workbook.
+- La primera línea de salida de la entrega final debe ser exactamente: BIO: [texto de máximo 150 caracteres], en una sola línea. Continúa con el encabezado PUBLICACIONES y las piezas con sus intenciones. Esto permite guardar la bio por separado.
 `;
 const CONTENT_90 = `${CONTENT_COMMON}
 MODO SISTEMA 90 DÍAS — Semana 6, Día 1:
