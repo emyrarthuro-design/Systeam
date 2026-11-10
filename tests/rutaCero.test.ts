@@ -443,4 +443,3 @@ test('consulta de GHL comprueba correo, ubicación, etiqueta y respuestas ambigu
     else process.env.RUTA_CERO_GHL_LOCATION_ID = previousLocation;
   }
 });
-
