@@ -1,8 +1,8 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { auth } from '../lib/firebase';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { learningRequest as request } from '../lib/rutaCeroLearning';
 import { DELIVERABLE_EXTENSIONS, lessons, MAX_DELIVERABLE_BYTES } from '../rutaCeroCurriculum';
 
-const api = '/api/ruta-cero/learning';
 type Status = 'started' | 'submitted' | 'changes' | 'approved';
 type Work = { id: string; lessonId: string; studentEmail: string; status: Status; version: number; submittedAt?: string;
   link?: string; file?: { name: string }; feedback?: string };
@@ -11,17 +11,6 @@ type ReviewPage = { progress: Work[]; nextCursor: string | null };
 const statusLabels = { started: 'En curso', submitted: 'Entregado', changes: 'Ajustes solicitados', approved: 'Aprobado' };
 const panel = 'rounded-2xl border border-sys-border bg-sys-card p-5';
 const button = 'btn-geometric-secondary disabled:opacity-50';
-
-async function request(path: string, init?: RequestInit) {
-  const token = await auth.currentUser?.getIdToken();
-  if (!token) throw new Error('Inicia sesión para continuar.');
-  const response = await fetch(api + path, { ...init, headers: { ...init?.headers, Authorization: `Bearer ${token}` } });
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.error || 'No se pudo completar la operación.');
-  }
-  return response;
-}
 
 const put = (body: object): RequestInit => ({ method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 const message = (error: unknown) => error instanceof Error ? error.message : 'Ocurrió un problema. Intenta nuevamente.';
@@ -50,8 +39,8 @@ function Artifact({ work }: { work: Work }) {
   </div>;
 }
 
-function ClassCard({ lesson, item, filesEnabled, refresh }: {
-  lesson: typeof lessons[number]; item?: Work; filesEnabled: boolean; refresh: () => Promise<void>;
+function ClassCard({ lesson, item, filesEnabled, refresh, selected }: {
+  lesson: typeof lessons[number]; item?: Work; filesEnabled: boolean; refresh: () => Promise<void>; selected: boolean;
 }) {
   const [link, setLink] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -60,6 +49,11 @@ function ClassCard({ lesson, item, filesEnabled, refresh }: {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const path = '/classes/' + lesson.id;
+  const card = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (selected) card.current?.focus();
+  }, [selected]);
 
   async function save(action: 'start' | 'submit') {
     setError('');
@@ -84,7 +78,8 @@ function ClassCard({ lesson, item, filesEnabled, refresh }: {
   }
 
   const date = new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(lesson.date));
-  return <article className={panel}>
+  return <article ref={card} tabIndex={-1} aria-label={lesson.title}
+    className={panel + (selected ? ' ring-2 ring-sys-accent' : '')}>
     <div className="flex flex-wrap items-center justify-between gap-2">
       <p className="text-xs font-semibold uppercase tracking-wider text-sys-text-sec">Clase {lesson.day} · {date}</p>
       <span className="rounded-full bg-sys-input px-3 py-1 text-xs font-semibold text-sys-accent">{item ? statusLabels[item.status] : 'Pendiente'}</span>
@@ -180,8 +175,10 @@ function TeacherAccess() {
 }
 
 export default function RutaCeroLearning() {
+  const [searchParams] = useSearchParams();
+  const linkedLesson = lessons.find(lesson => lesson.id === searchParams.get('clase'));
   const [access, setAccess] = useState<Access | null>(null);
-  const [week, setWeek] = useState(1);
+  const [week, setWeek] = useState(linkedLesson?.week ?? 1);
   const [view, setView] = useState<'route' | 'review'>('route');
   const [reviews, setReviews] = useState<ReviewPage>({ progress: [], nextCursor: null });
   const [filter, setFilter] = useState('');
@@ -240,7 +237,7 @@ export default function RutaCeroLearning() {
       <p className="mb-4 text-sm text-sys-text-sec">Mentor: {selected[0].teacher}</p>
       <div className="grid gap-4 lg:grid-cols-3">
         {selected.map(lesson => <ClassCard key={lesson.id} lesson={lesson} item={access.progress.find(item => item.lessonId === lesson.id)}
-          filesEnabled={access.filesEnabled} refresh={refresh} />)}
+          filesEnabled={access.filesEnabled} refresh={refresh} selected={linkedLesson?.id === lesson.id} />)}
       </div>
     </>}
     {view === 'review' && access.reviewer && <div className="grid gap-4">

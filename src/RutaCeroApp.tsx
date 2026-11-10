@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './components/AuthProvider';
 import ErrorBoundary from './components/ErrorBoundary';
 import Login from './pages/Login';
 import RutaCero from './pages/RutaCero';
+import RutaCeroClasses from './pages/RutaCeroClasses';
 import RutaCeroLearning from './pages/RutaCeroLearning';
 import logo from './assets/ruta-cero-logo.png';
 import './ruta-cero-brand.css';
@@ -20,6 +21,7 @@ function Portal() {
           <Link to="/" aria-label="Inicio de Ruta Cero"><img src={logo} alt="Ruta Cero" className="w-36" /></Link>
           <nav className="flex flex-wrap gap-3 text-sm" aria-label="Portal">
             <Link to="/" className="hover:text-sys-accent">Mi ruta</Link>
+            <Link to="/clases" className="hover:text-sys-accent">Clases</Link>
             <Link to="/asistentes" className="hover:text-sys-accent">Asistentes y Workbook</Link>
           </nav>
           <button className="text-sm hover:text-amber-400" onClick={async () => {
@@ -31,6 +33,7 @@ function Portal() {
       <main>
         <Routes>
           <Route path="/" element={user ? <RutaCeroLearning /> : <Navigate to="/login" replace />} />
+          <Route path="/clases" element={user ? <RutaCeroClasses /> : <Navigate to="/login" replace />} />
           <Route path="/asistentes" element={user ? <RutaCero /> : <Navigate to="/login" replace />} />
           <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login rutaCeroLogo={logo} />} />
           <Route path="*" element={<Navigate to="/" replace />} />

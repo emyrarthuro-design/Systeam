@@ -18,6 +18,7 @@ type ClassWork = {
 const path = '/api/ruta-cero/learning';
 const work = 'rutaCeroClassWork';
 const teachers = 'rutaCeroTeachers';
+const recordings = 'rutaCeroRecordings';
 const lessonIds = new Set(lessons.map(lesson => lesson.id));
 
 class LearningError extends Error {
@@ -63,6 +64,23 @@ function workId(value: string) {
   return value;
 }
 
+function youtubeVideoId(input: unknown) {
+  const error = new LearningError(400, 'Pega el enlace HTTPS de un video o transmisión de YouTube.');
+  if (typeof input !== 'string' || input.length > 2048) throw error;
+  let url: URL;
+  try { url = new URL(input.trim()); } catch { throw error; }
+  if (url.protocol !== 'https:' || url.username || url.password || url.port) throw error;
+  let id: string | null = null;
+  if (url.hostname === 'youtu.be') {
+    id = /^\/([\w-]{11})\/?$/.exec(url.pathname)?.[1] ?? null;
+  } else if (['youtube.com', 'www.youtube.com', 'm.youtube.com'].includes(url.hostname)) {
+    id = url.pathname === '/watch' ? url.searchParams.get('v') :
+      /^\/(?:live|embed|shorts)\/([\w-]{11})\/?$/.exec(url.pathname)?.[1] ?? null;
+  }
+  if (!id || !/^[\w-]{11}$/.test(id)) throw error;
+  return id;
+}
+
 export function registerLearningRoutes(app: Express, deps: {
   caller: (req: Request) => Promise<Identity>;
   eligible: (req: Request) => Promise<Identity>;
@@ -80,6 +98,10 @@ export function registerLearningRoutes(app: Express, deps: {
     const role = await identity.firestore.collection(teachers).doc(identity.uid).get();
     const data = role.data();
     return data?.active === true && data.email === identity.email;
+  }
+  async function canStudy(identity: Identity) {
+    return identity.adminUser ||
+      (await identity.firestore.collection('rutaCeroEnrollments').doc(identity.uid).get()).data()?.active === true;
   }
   const studentOnly: RequestHandler = async (req, res, next) => {
     try { res.locals.identity = await deps.eligible(req); next(); } catch (error) { fail(res, error); }
@@ -114,12 +136,34 @@ export function registerLearningRoutes(app: Express, deps: {
   app.get(path, route(async (req, res) => {
     const identity = await deps.caller(req);
     const reviewer = await canReview(identity);
-    let student = identity.adminUser;
-    if (!student) student = (await identity.firestore.collection('rutaCeroEnrollments').doc(identity.uid).get()).data()?.active === true;
+    const student = await canStudy(identity);
     if (!student && !reviewer) throw new Error('ACCESS');
     const own = student ? await identity.firestore.collection(work).where('uid', '==', identity.uid).get() : null;
     res.json({ student, reviewer, admin: identity.adminUser, filesEnabled: Boolean(process.env.RUTA_CERO_DELIVERABLES_BUCKET),
       progress: own?.docs.map(doc => serialize(doc.id, doc.data() as ClassWork)) || [] });
+  }));
+
+  app.get(path + '/recordings', route(async (req, res) => {
+    const identity = await deps.caller(req);
+    const student = await canStudy(identity);
+    if (!student && !await canReview(identity)) throw new Error('ACCESS');
+    const snapshot = await identity.firestore.collection(recordings).get();
+    const videos = Object.fromEntries(snapshot.docs.flatMap(doc => {
+      const { videoId } = doc.data();
+      return lessonIds.has(doc.id) && typeof videoId === 'string' && /^[\w-]{11}$/.test(videoId) ?
+        [[doc.id, videoId]] : [];
+    }));
+    res.json({ videos, admin: identity.adminUser, student });
+  }));
+
+  app.put(path + '/recordings/:lessonId', route(async (req, res) => {
+    const identity = await deps.caller(req);
+    if (!identity.adminUser) throw new Error('ACCESS');
+    const ref = identity.firestore.collection(recordings).doc(lessonId(req.params.lessonId));
+    const videoId = req.body?.url === null ? null : youtubeVideoId(req.body?.url);
+    if (videoId === null) await ref.delete();
+    else await ref.set({ videoId, updatedBy: identity.uid, updatedAt: FieldValue.serverTimestamp() });
+    res.json({ videoId });
   }));
 
   app.put(path + '/classes/:lessonId', studentOnly, writeLimit, route(async (req, res) => {

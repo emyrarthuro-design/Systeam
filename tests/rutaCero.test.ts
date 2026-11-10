@@ -20,10 +20,15 @@ function buildStore() {
     ['rutaCeroEnrollments/alpha', { uid: 'alpha', active: true, program: 'ruta-cero' }]
   ]);
   const collection = (path: string): any => ({
+    get: async () => ({
+      docs: [...records].filter(([key]) => key.startsWith(path + '/') && !key.slice(path.length + 1).includes('/'))
+        .map(([key, data]) => ({ id: key.slice(path.length + 1), data: () => data }))
+    }),
     doc: (id: string): any => {
       const key = path + '/' + id;
       return {
         get: async (): Promise<StubDoc> => ({ exists: records.has(key), data: () => records.get(key) }),
+        delete: async () => { records.delete(key); },
         set: async (data: RecordData, opts?: { merge?: boolean }) => {
           const previous = records.get(key) || {};
           records.set(key, opts?.merge
@@ -121,6 +126,27 @@ test('Ruta Cero API protege acceso, Workbook, chat y activación por cuenta', as
   await t.test('sin sesión devuelve 401', async () => {
     const result = await call('state');
     assert.equal(result.status, 401);
+  });
+  await t.test('solo administradores verificados publican o retiran videos de clases', async () => {
+    const base = 'learning/recordings';
+    const recording = base + '/s1c1';
+    const id = 'M7lc1UVf-VE';
+    assert.equal((await call(base)).status, 401);
+    assert.equal((await call(base, 'beta')).status, 403);
+    assert.deepEqual((await call(base, 'alpha')).payload, { videos: {}, admin: false, student: true });
+    for (const login of ['alpha', 'unverified']) {
+      assert.equal((await call(recording, login, { url: 'https://youtu.be/' + id }, 'PUT')).status, 403);
+    }
+    for (const url of ['https://youtube.com.example.test/watch?v=' + id, 'http://youtu.be/' + id, 'https://youtu.be/invalid']) {
+      assert.equal((await call(recording, 'admin', { url }, 'PUT')).status, 400);
+    }
+    assert.equal((await call(base + '/unknown', 'admin', { url: 'https://youtu.be/' + id }, 'PUT')).status, 404);
+    for (const url of ['https://youtu.be/' + id, 'https://www.youtube.com/watch?v=' + id, 'https://www.youtube.com/live/' + id]) {
+      assert.deepEqual(await call(recording, 'admin', { url }, 'PUT'), { status: 200, payload: { videoId: id } });
+      assert.deepEqual((await call(base, 'alpha')).payload.videos, { s1c1: id });
+    }
+    assert.deepEqual(await call(recording, 'admin', { url: null }, 'PUT'), { status: 200, payload: { videoId: null } });
+    assert.deepEqual((await call(base, 'alpha')).payload.videos, {});
   });
   await t.test('sin inscripción devuelve 403 aunque tenga sesión', async () => {
     const result = await call('state', 'beta');
