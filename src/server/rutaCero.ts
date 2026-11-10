@@ -58,7 +58,8 @@ export function registerRutaCeroRoutes(app: Express, deps: Deps) {
     const userSnap = await firestore.collection('users').doc(decoded.uid).get();
     if (!userSnap.exists) throw new Error('AUTH');
     const email = (decoded.email || '').trim().toLowerCase();
-    const adminUser = decoded.email_verified === true && deps.isAdminEmail(email);
+    const adminUser = decoded.email_verified === true &&
+      (deps.isAdminEmail(email) || decoded.rutaCeroAdmin === true);
     return { uid: decoded.uid, email, emailVerified: decoded.email_verified === true, adminUser, firestore };
   }
 

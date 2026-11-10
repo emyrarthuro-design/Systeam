@@ -30,7 +30,9 @@ export default function Login({ rutaCeroLogo }: { rutaCeroLogo?: string }) {
       // privilegiadas automáticamente ni almacenar contraseñas en el código.
       const credential = await signInWithEmailAndPassword(auth, cleanEmail, password);
       const adminEmail = SUPER_ADMIN_EMAILS.includes(cleanEmail) || ADMIN_EMAILS.includes(cleanEmail);
-      if (adminEmail && !credential.user.emailVerified) {
+      const portalAdmin = rutaCeroLogo && !credential.user.emailVerified &&
+        (await credential.user.getIdTokenResult()).claims.rutaCeroAdmin === true;
+      if ((adminEmail || portalAdmin) && !credential.user.emailVerified) {
         try {
           await sendEmailVerification(credential.user);
         } catch (verificationError) {

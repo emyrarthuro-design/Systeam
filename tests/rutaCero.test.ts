@@ -16,6 +16,7 @@ function buildStore() {
     ['users/beta', { uid: 'beta', email: 'beta@example.test', role: 'student' }],
     ['users/admin', { uid: 'admin', email: 'verified-admin@example.test', role: 'admin' }],
     ['users/unverified', { uid: 'unverified', email: 'verified-admin@example.test', role: 'admin' }],
+    ['users/portal-admin', { uid: 'portal-admin', email: 'portal-admin@example.test', role: 'student' }],
     ['users/spoofed', { uid: 'spoofed', email: 'claimed@example.test', role: 'student' }],
     ['rutaCeroEnrollments/alpha', { uid: 'alpha', active: true, program: 'ruta-cero' }]
   ]);
@@ -64,11 +65,13 @@ function buildStore() {
 
 test('Ruta Cero API protege acceso, Workbook, chat y activación por cuenta', async t => {
   const store = buildStore();
-  const logins: Record<string, { uid: string; email: string; email_verified: boolean }> = {
+  const logins: Record<string, { uid: string; email: string; email_verified: boolean; rutaCeroAdmin?: boolean }> = {
     alpha: { uid: 'alpha', email: 'alpha@example.test', email_verified: false },
     beta: { uid: 'beta', email: 'beta@example.test', email_verified: false },
     admin: { uid: 'admin', email: 'verified-admin@example.test', email_verified: true },
-    unverified: { uid: 'unverified', email: 'verified-admin@example.test', email_verified: false }
+    unverified: { uid: 'unverified', email: 'verified-admin@example.test', email_verified: false },
+    portalAdmin: { uid: 'portal-admin', email: 'portal-admin@example.test', email_verified: true, rutaCeroAdmin: true },
+    unverifiedPortalAdmin: { uid: 'portal-admin', email: 'portal-admin@example.test', email_verified: false, rutaCeroAdmin: true }
   };
   const aiCalls: unknown[] = [];
   const app = express();
@@ -126,6 +129,10 @@ test('Ruta Cero API protege acceso, Workbook, chat y activación por cuenta', as
   await t.test('sin sesión devuelve 401', async () => {
     const result = await call('state');
     assert.equal(result.status, 401);
+  });
+  await t.test('el permiso de administración de Ruta Cero requiere un correo verificado', async () => {
+    assert.deepEqual((await call('learning/recordings', 'portalAdmin')).payload, { videos: {}, admin: true, student: true });
+    assert.equal((await call('learning/recordings', 'unverifiedPortalAdmin')).status, 403);
   });
   await t.test('solo administradores verificados publican o retiran videos de clases', async () => {
     const base = 'learning/recordings';
