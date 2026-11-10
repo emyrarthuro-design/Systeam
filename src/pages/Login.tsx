@@ -233,7 +233,7 @@ export default function Login({ rutaCeroLogo }: { rutaCeroLogo?: string }) {
             
             <div className="mt-8 text-center">
               <p className="text-sm text-sys-text-mut">
-                {rutaCeroLogo ? '¿Te falta la inscripción? Contacta al equipo de Ruta Cero.' : <>¿No tienes cuenta? Tu acceso es por invitación.<br className="hidden md:block"/> Contacta a SysTeam.</>}
+                {rutaCeroLogo ? <>¿Aún no tienes acceso? <Link to="/crear-cuenta" className="font-semibold text-sys-accent underline">Crear cuenta</Link></> : <>¿No tienes cuenta? Tu acceso es por invitación.<br className="hidden md:block"/> Contacta a SysTeam.</>}
               </p>
             </div>
           </motion.div>

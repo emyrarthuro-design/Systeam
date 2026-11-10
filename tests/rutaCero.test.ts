@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import type { AddressInfo } from 'node:net';
 import express from 'express';
 import { registerRutaCeroRoutes } from '../src/server/rutaCero';
+import { findApprovedContact, RUTA_CERO_GHL_TAG } from '../src/server/rutaCeroRegistration';
 
 type RecordData = Record<string, any>;
 type StubDoc = {
@@ -59,7 +60,15 @@ function buildStore() {
       })
     })
   });
-  return { records, db: { collection } };
+  const runTransaction = async (action: (tx: any) => Promise<void>) => {
+    const writes: Array<() => Promise<void>> = [];
+    await action({
+      get: (ref: any) => ref.get(),
+      create: (ref: any, data: RecordData) => { writes.push(() => ref.set(data)); }
+    });
+    for (const write of writes) await write();
+  };
+  return { records, db: { collection, runTransaction } };
 }
 
 test('Ruta Cero API protege acceso, Workbook, chat y activación por cuenta', async t => {
@@ -68,9 +77,13 @@ test('Ruta Cero API protege acceso, Workbook, chat y activación por cuenta', as
     alpha: { uid: 'alpha', email: 'alpha@example.test', email_verified: false },
     beta: { uid: 'beta', email: 'beta@example.test', email_verified: false },
     admin: { uid: 'admin', email: 'verified-admin@example.test', email_verified: true },
-    unverified: { uid: 'unverified', email: 'verified-admin@example.test', email_verified: false }
+    unverified: { uid: 'unverified', email: 'verified-admin@example.test', email_verified: false },
+    pending: { uid: 'pending', email: 'pending@example.test', email_verified: false },
+    verifiedPending: { uid: 'pending', email: 'pending@example.test', email_verified: true }
   };
   const aiCalls: unknown[] = [];
+  let registrationStatus = 200;
+  let registrationContacts: unknown[] = [];
   const app = express();
   app.use(express.json());
   registerRutaCeroRoutes(app, {
@@ -103,7 +116,11 @@ test('Ruta Cero API protege acceso, Workbook, chat y activación por cuenta', as
         }
       }
     }) as any,
-    isAdminEmail: (email: string) => email === 'verified-admin@example.test'
+    isAdminEmail: (email: string) => email === 'verified-admin@example.test',
+    registrationFetch: async (_url, init) => {
+      assert.deepEqual(JSON.parse(init!.body as string).filters, [{ field: 'email', operator: 'eq', value: 'pending@example.test' }]);
+      return new Response(JSON.stringify({ contacts: registrationContacts }), { status: registrationStatus });
+    }
   });
   const server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
@@ -126,6 +143,40 @@ test('Ruta Cero API protege acceso, Workbook, chat y activación por cuenta', as
   await t.test('sin sesión devuelve 401', async () => {
     const result = await call('state');
     assert.equal(result.status, 401);
+  });
+  await t.test('registro exige correo verificado y etiqueta, conserva el perfil y respeta una baja administrativa', async () => {
+    const oldToken = process.env.RUTA_CERO_GHL_TOKEN;
+    const oldLocation = process.env.RUTA_CERO_GHL_LOCATION_ID;
+    process.env.RUTA_CERO_GHL_TOKEN = 'test-only-token';
+    process.env.RUTA_CERO_GHL_LOCATION_ID = 'test-location';
+    const path = 'registration/activate';
+    try {
+      assert.equal((await call(path, undefined, {})).status, 401);
+      assert.equal((await call(path, 'pending', {})).status, 403);
+      assert.equal((await call(path, 'verifiedPending', {})).status, 403);
+      assert.equal(store.records.has('users/pending'), false);
+      registrationStatus = 503;
+      assert.equal((await call(path, 'verifiedPending', {})).status, 503);
+      assert.equal(store.records.has('rutaCeroEnrollments/pending'), false);
+      registrationStatus = 200;
+      registrationContacts = [{ id: 'contact-test', email: 'pending@example.test', locationId: 'test-location', tags: [RUTA_CERO_GHL_TAG] }];
+      const input = { fullName: 'Persona de prueba', role: 'admin', email: 'otra@example.test' };
+      assert.equal((await call(path, 'verifiedPending', input)).status, 200);
+      assert.equal(store.records.get('users/pending')?.role, 'student');
+      assert.equal(store.records.get('users/pending')?.email, 'pending@example.test');
+      assert.equal(store.records.get('rutaCeroEnrollments/pending')?.validatedTag, RUTA_CERO_GHL_TAG);
+      store.records.get('users/pending')!.fullName = 'Nombre actualizado';
+      assert.equal((await call(path, 'verifiedPending', input)).status, 200);
+      assert.equal(store.records.get('users/pending')?.fullName, 'Nombre actualizado');
+      store.records.get('rutaCeroEnrollments/pending')!.active = false;
+      assert.equal((await call(path, 'verifiedPending', input)).status, 403);
+      assert.equal(store.records.get('rutaCeroEnrollments/pending')?.active, false);
+    } finally {
+      if (oldToken === undefined) delete process.env.RUTA_CERO_GHL_TOKEN;
+      else process.env.RUTA_CERO_GHL_TOKEN = oldToken;
+      if (oldLocation === undefined) delete process.env.RUTA_CERO_GHL_LOCATION_ID;
+      else process.env.RUTA_CERO_GHL_LOCATION_ID = oldLocation;
+    }
   });
   await t.test('solo administradores verificados publican o retiran videos de clases', async () => {
     const base = 'learning/recordings';
@@ -354,3 +405,42 @@ test('Ruta Cero API protege acceso, Workbook, chat y activación por cuenta', as
     assert.deepEqual(after.payload.messages, []);
   });
 });
+
+test('consulta de GHL comprueba correo, ubicación, etiqueta y respuestas ambiguas', async () => {
+  const previousToken = process.env.RUTA_CERO_GHL_TOKEN;
+  const previousLocation = process.env.RUTA_CERO_GHL_LOCATION_ID;
+  process.env.RUTA_CERO_GHL_TOKEN = 'test-only-token';
+  process.env.RUTA_CERO_GHL_LOCATION_ID = 'test-location';
+  const email = 'persona@example.test';
+  const valid = { id: 'contact', email, locationId: 'test-location', tags: [RUTA_CERO_GHL_TAG] };
+  function request(body: object, status = 200): typeof fetch {
+    return async (url, init) => {
+      assert.equal(url, 'https://services.leadconnectorhq.com/contacts/search');
+      assert.equal(new Headers(init?.headers).get('Version'), '2021-07-28');
+      assert.equal(JSON.parse(init!.body as string).locationId, 'test-location');
+      return new Response(JSON.stringify(body), { status });
+    };
+  }
+  try {
+    assert.deepEqual(await findApprovedContact(email, request({ contacts: [valid] })),
+      { contactId: 'contact', locationId: 'test-location' });
+    const denied = [
+      { contacts: [] }, { contacts: [valid, valid] }, { contacts: [valid], total: 3 },
+      { contacts: [{ ...valid, email: 'otra@example.test' }] },
+      { contacts: [{ ...valid, tags: ['rc_g7_nov26'] }] },
+      { contacts: [{ ...valid, locationId: 'other-location' }] }
+    ];
+    for (const result of denied) await assert.rejects(findApprovedContact(email, request(result)), { status: 403 });
+    await assert.rejects(findApprovedContact(email, request({ message: 'invalid' })), { status: 503 });
+    await assert.rejects(findApprovedContact(email, request({}, 401)), { status: 503 });
+    await assert.rejects(findApprovedContact(email, async () => { throw new Error('network'); }), { status: 503 });
+    delete process.env.RUTA_CERO_GHL_TOKEN;
+    await assert.rejects(findApprovedContact(email, request({ contacts: [valid] })), { status: 503 });
+  } finally {
+    if (previousToken === undefined) delete process.env.RUTA_CERO_GHL_TOKEN;
+    else process.env.RUTA_CERO_GHL_TOKEN = previousToken;
+    if (previousLocation === undefined) delete process.env.RUTA_CERO_GHL_LOCATION_ID;
+    else process.env.RUTA_CERO_GHL_LOCATION_ID = previousLocation;
+  }
+});
+

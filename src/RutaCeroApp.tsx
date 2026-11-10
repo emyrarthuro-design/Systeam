@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import RutaCero from './pages/RutaCero';
 import RutaCeroClasses from './pages/RutaCeroClasses';
 import RutaCeroLearning from './pages/RutaCeroLearning';
+import RutaCeroRegister from './pages/RutaCeroRegister';
 import logo from './assets/ruta-cero-logo.png';
 import './ruta-cero-brand.css';
 
@@ -36,6 +37,7 @@ function Portal() {
           <Route path="/clases" element={user ? <RutaCeroClasses /> : <Navigate to="/login" replace />} />
           <Route path="/asistentes" element={user ? <RutaCero /> : <Navigate to="/login" replace />} />
           <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login rutaCeroLogo={logo} />} />
+          <Route path="/crear-cuenta" element={<RutaCeroRegister />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

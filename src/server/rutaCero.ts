@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit';
 import { resolveAgent, WORKBOOK_FIELDS, type WorkbookField } from './rutaCeroAgents';
 import { OfferValidationError, validateLowTicket, validateNextLevel, formatLowTicket, formatNextLevel } from './rutaCeroOfferLogic';
 import { registerLearningRoutes } from './rutaCeroLearning';
+import { registerRutaCeroRegistration } from './rutaCeroRegistration';
 
 /**
  * Ruta Cero MVP: server-owned workbook + private conversations.
@@ -18,6 +19,7 @@ type Deps = {
   // Optional injection for automated API tests, never supplied in production.
   getFirestoreForApp?: (app: admin.app.App, databaseId: string) => ReturnType<typeof getFirestore>;
   isAdminEmail: (email: string) => boolean;
+  registrationFetch?: typeof fetch;
 };
 type Message = { role: 'user' | 'assistant'; content: string };
 const MAX_MESSAGES = 24;
@@ -42,6 +44,7 @@ function safeError(error: unknown) {
 }
 
 export function registerRutaCeroRoutes(app: Express, deps: Deps) {
+  registerRutaCeroRegistration(app, deps);
   async function caller(req: Request) {
     const header = req.headers.authorization;
     if (!header || !header.startsWith('Bearer ')) throw new Error('AUTH');

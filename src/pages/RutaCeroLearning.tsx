@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { learningRequest as request } from '../lib/rutaCeroLearning';
 import { DELIVERABLE_EXTENSIONS, lessons, MAX_DELIVERABLE_BYTES } from '../rutaCeroCurriculum';
 
@@ -210,6 +210,7 @@ export default function RutaCeroLearning() {
   if (!access) return <div className="mx-auto max-w-5xl px-4 py-10">
     <h1 className="text-2xl font-bold">Mi ruta</h1>
     <p className="mt-3 text-sys-text-sec" role={error ? 'alert' : 'status'}>{error || 'Cargando tu ruta…'}</p>
+    {error && <Link className="mt-4 inline-block text-sys-accent underline" to="/crear-cuenta">Activar mi inscripción</Link>}
   </div>;
   const delivered = access.progress.filter(item => item.version > 0).length;
   const approved = access.progress.filter(item => item.status === 'approved').length;
