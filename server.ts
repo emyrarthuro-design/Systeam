@@ -1,17 +1,24 @@
 import dotenv from "dotenv";
+import { registerRutaCeroRoutes } from "./src/server/rutaCero";
 dotenv.config();
 import express from "express";
+import type { RequestHandler } from "express";
 import path from "path";
 import { GoogleGenAI, Type } from "@google/genai";
-import { createServer as createViteServer } from "vite";
 import fs from "fs";
 import admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 // Read config for database ID
 const firebaseConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'firebase-applet-config.json'), 'utf-8'));
 const databaseId = firebaseConfig.firestoreDatabaseId || '(default)';
+const expectedProject = process.env.SYSTEAM_EXPECTED_FIREBASE_PROJECT;
+const appKind = process.env.SYSTEAM_APP_KIND || 'systeam';
+if (appKind !== 'systeam' && appKind !== 'ruta-cero') throw new Error('Aplicación desconocida.');
+if (expectedProject && (firebaseConfig.projectId !== expectedProject || databaseId !== '(default)')) {
+  throw new Error('La configuración de Firebase no coincide con el destino de despliegue.');
+}
 
 let adminApp: admin.app.App | null = null;
 
@@ -26,14 +33,23 @@ function getFirebaseAdmin(): admin.app.App {
   
   const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!serviceAccountJson || serviceAccountJson === 'MY_FIREBASE_SERVICE_ACCOUNT_JSON') {
+    if (expectedProject) {
+      adminApp = admin.initializeApp({
+        projectId: expectedProject,
+        credential: admin.credential.applicationDefault(),
+      });
+      return adminApp;
+    }
     throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON not configured in environment');
   }
-  
   let serviceAccount;
   try {
     serviceAccount = JSON.parse(serviceAccountJson);
   } catch (e) {
     throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON');
+  }
+  if (expectedProject && serviceAccount.project_id !== expectedProject) {
+    throw new Error('La cuenta de servicio no pertenece al proyecto de despliegue.');
   }
   
   adminApp = admin.initializeApp({
@@ -42,6 +58,21 @@ function getFirebaseAdmin(): admin.app.App {
   
   return adminApp;
 }
+
+const requireStudentSession: RequestHandler = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    res.status(401).json({ details: 'Inicia sesión para continuar.' });
+    return;
+  }
+  try {
+    await getFirebaseAdmin().auth().verifyIdToken(authHeader.slice(7), true);
+  } catch {
+    res.status(401).json({ details: 'Inicia sesión nuevamente para continuar.' });
+    return;
+  }
+  next();
+};
 
 async function verifyAdminCaller(req: express.Request): Promise<{
   uid: string;
@@ -56,9 +87,10 @@ async function verifyAdminCaller(req: express.Request): Promise<{
   
   const idToken = authHeader.substring(7);
   const adminInstance = getFirebaseAdmin();
-  const decoded = await adminInstance.auth().verifyIdToken(idToken);
+  const decoded = await adminInstance.auth().verifyIdToken(idToken, true);
   
   const email = (decoded.email || '').toLowerCase();
+  if (!decoded.email_verified) throw new Error('FORBIDDEN: Admin email is not verified');
   
   const isSuperAdmin = SUPER_ADMIN_EMAILS.includes(email);
   const isAdmin = isSuperAdmin || ADMIN_EMAILS.includes(email);
@@ -87,19 +119,34 @@ const invitationValidationLimiter = rateLimit({
     error: 'Demasiados intentos. Espera un minuto antes de volver a intentar.',
     retryAfter: 60
   },
-  keyGenerator: (req) => {
-    return (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || req.ip || 'unknown';
-  }
+  keyGenerator: req => ipKeyGenerator(req.ip || req.socket.remoteAddress || 'unknown')
 });
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const port = Number(process.env.PORT || 3000);
+  if (expectedProject && process.env.K_SERVICE) app.set('trust proxy', 1);
+  if (appKind === 'systeam' && process.env.RUTA_CERO_PORTAL_URL) {
+    const portalUrl = new URL(process.env.RUTA_CERO_PORTAL_URL);
+    if (portalUrl.protocol !== 'https:' || portalUrl.username || portalUrl.password) {
+      throw new Error('La URL del portal Ruta Cero no es válida.');
+    }
+    app.get('/ruta-cero', (_req, res) => res.redirect(302, portalUrl.href));
+  }
 
   app.use(express.json());
+  app.use('/api', (req, res, next) => {
+    const isRutaCeroApi = /^\/ruta-cero(?:\/|$)/i.test(req.path);
+    if (isRutaCeroApi !== (appKind === 'ruta-cero')) {
+      res.status(404).json({ error: 'Ruta no disponible.' });
+      return;
+    }
+    next();
+  });
 
   app.get('/api/invitations/test-all', async (req, res) => {
     try {
+      await verifyAdminCaller(req);
       const adminInstance = getFirebaseAdmin();
       const firestore = getFirestore(adminInstance, databaseId);
       const snap = await firestore.collection('invitations').get();
@@ -339,7 +386,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/analyze", async (req, res) => {
+  app.post("/api/analyze", requireStudentSession, async (req, res) => {
     try {
       const { variables, affinityRank, textAnswers } = req.body;
       
@@ -378,7 +425,7 @@ ${textAnswers}
 
       const ai = getAI();
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-pro-preview",
+        model: process.env.SYSTEAM_DIAGNOSIS_GEMINI_MODEL || "gemini-3.1-pro-preview",
         contents: prompt,
         config: {
           systemInstruction: systemInstruction,
@@ -471,7 +518,7 @@ ${textAnswers}
     }
   });
 
-  app.post("/api/improve-text", async (req, res) => {
+  app.post("/api/improve-text", requireStudentSession, async (req, res) => {
     try {
       const { text } = req.body;
       if (!text || typeof text !== 'string') {
@@ -482,7 +529,7 @@ ${textAnswers}
 
       const ai = getAI();
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-pro-preview",
+        model: process.env.SYSTEAM_DIAGNOSIS_GEMINI_MODEL || "gemini-3.1-pro-preview",
         contents: text,
         config: {
           systemInstruction: systemInstruction,
@@ -497,8 +544,16 @@ ${textAnswers}
     }
   });
 
+  if (appKind === 'ruta-cero') registerRutaCeroRoutes(app, {
+    getFirebaseAdmin,
+    getAI,
+    databaseId,
+    isAdminEmail: (email) => SUPER_ADMIN_EMAILS.includes(email) || ADMIN_EMAILS.includes(email)
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -517,8 +572,8 @@ ${textAnswers}
     }
   }
 
-  app.listen(Number(PORT), "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT}`);
+  app.listen(port, process.env.HOST || "0.0.0.0", () => {
+    console.log(`Server running on port ${port}`);
   });
 }
 

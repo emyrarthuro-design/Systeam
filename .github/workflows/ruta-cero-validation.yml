@@ -1,0 +1,47 @@
+name: Validate Systeam (TypeScript and build)
+on:
+  push:
+    branches:
+      - feature/ruta-cero-agentes-mvp
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Production dependency audit (block high and critical)
+        run: npm audit --omit=dev --audit-level=high
+      - name: TypeScript validation
+        run: npm run lint
+      - name: Ruta Cero API access and workbook tests
+        run: npm run test:api
+      - name: Production build
+        run: npm run build
+      - name: Independent Ruta Cero build
+        env:
+          SYSTEAM_APP_KIND: ruta-cero
+        run: npm run build
+      - name: Java for Firestore emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install Firebase emulator test tools (CI only)
+        run: npm install --no-save --package-lock=false @firebase/rules-unit-testing@5.0.0 firebase-tools@14.26.0
+      - name: Verify private Firestore rules in isolated demo emulator
+        env:
+          CI: true
+        run: ./node_modules/.bin/firebase emulators:exec --project demo-ruta-cero-security --config firebase.ci.json --only firestore "node --test tests/firestoreRules.test.mjs"

@@ -1,0 +1,27 @@
+:root[data-app="ruta-cero"] {
+  --color-sys-bg: #050608;
+  --color-sys-card: #0f141e;
+  --color-sys-input: #141d2a;
+  --color-sys-border: #273449;
+  --color-sys-text-main: #f8f9fc;
+  --color-sys-text-sec: #aeb7c5;
+  --color-sys-text-mut: #8796ad;
+  --color-sys-accent: #8ca0ff;
+  --color-sys-accent-hover: #b1bdff;
+  --color-sys-accent-active: #667cff;
+  --color-sys-accent-light: #1028f733;
+  --color-sys-accent-alpha: #1028f744;
+  --color-sys-success: #82d9b6;
+}
+
+[data-app="ruta-cero"] .btn-geometric-primary,
+[data-app="ruta-cero"] .bg-amber-500.text-black {
+  background-color: #1028f7;
+  color: #fff;
+  box-shadow: 0 4px 12px #1028f733;
+}
+
+[data-app="ruta-cero"] .btn-geometric-primary:hover,
+[data-app="ruta-cero"] .bg-amber-500.text-black:hover {
+  background-color: #243fff;
+}

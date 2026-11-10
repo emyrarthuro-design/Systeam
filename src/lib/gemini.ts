@@ -1,9 +1,15 @@
+import { auth } from './firebase';
+
+async function authenticatedHeaders() {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Inicia sesión para continuar.');
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+}
+
 export async function generateDiagnosisReasoning(variables: Record<string, number>, affinityRank: any[], textAnswers: string): Promise<any> {
   const response = await fetch('/api/analyze', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers: await authenticatedHeaders(),
     body: JSON.stringify({ variables, affinityRank, textAnswers })
   });
 
@@ -34,9 +40,7 @@ export async function generateDiagnosisReasoning(variables: Record<string, numbe
 export async function improveTextWithAI(text: string): Promise<string> {
   const response = await fetch('/api/improve-text', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers: await authenticatedHeaders(),
     body: JSON.stringify({ text })
   });
 
@@ -52,3 +56,4 @@ export async function improveTextWithAI(text: string): Promise<string> {
   const data = await response.json();
   return data.text;
 }
+
