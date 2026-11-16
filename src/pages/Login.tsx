@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { signInWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification, signOut } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Lock, AlertTriangle, Key } from 'lucide-react';
-import { SUPER_ADMIN_EMAILS } from '../lib/admins';
+import { SUPER_ADMIN_EMAILS, ADMIN_EMAILS } from '../lib/admins';
 
-export default function Login() {
+export default function Login({ rutaCeroLogo }: { rutaCeroLogo?: string }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -17,96 +17,42 @@ export default function Login() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanEmail = email.trim();
+    const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail || !password) {
       setError('Por favor completa todos los campos');
       return;
     }
-    
+
     setLoading(true);
     setError('');
-    
     try {
-      let isCreatingAdmin = false;
-      try {
-        const cred = await signInWithEmailAndPassword(auth, cleanEmail, password);
-        if (SUPER_ADMIN_EMAILS.includes(cleanEmail.toLowerCase())) {
-          const { doc, setDoc } = await import('firebase/firestore');
-          // Forzar a super_admin
-          await setDoc(doc(db, 'users', cred.user.uid), {
-            uid: cred.user.uid,
-            email: cleanEmail,
-            fullName: 'Emyr Arthuro',
-            role: 'super_admin',
-            updatedAt: new Date().toISOString(),
-          }, { merge: true });
-        }
-      } catch (signInErr: any) {
-        if (SUPER_ADMIN_EMAILS.includes(cleanEmail.toLowerCase()) && (signInErr.code === 'auth/invalid-credential' || signInErr.code === 'auth/user-not-found')) {
-          isCreatingAdmin = true;
-          const { createUserWithEmailAndPassword } = await import('firebase/auth');
-          const { doc, setDoc } = await import('firebase/firestore');
-          const uc = await createUserWithEmailAndPassword(auth, cleanEmail, password);
-          await setDoc(doc(db, 'users', uc.user.uid), {
-            uid: uc.user.uid,
-            email: cleanEmail,
-            fullName: 'Emyr Arthuro',
-            role: 'super_admin',
-            createdAt: new Date().toISOString(),
-          });
-        } else {
-          throw signInErr;
-        }
-      }
-
-      // Wait a moment for auth state to propagate to App.tsx
-      if (SUPER_ADMIN_EMAILS.includes(cleanEmail.toLowerCase()) || isCreatingAdmin) {
-         setTimeout(() => navigate('/admin'), 500);
-      } else {
-         setTimeout(() => navigate('/diagnostico'), 500);
-      }
-    } catch (err: any) {
-      if (import.meta.env.DEV) console.error(err);
-      
-      // Auto-bootstrap admin account if it doesn't exist
-      if (cleanEmail === 'info@emyrarthuro.com' && password === 'Admin2026!' && err.code === 'auth/invalid-credential') {
+      // Administradores se aprovisionan fuera del cliente: nunca crear cuentas
+      // privilegiadas automáticamente ni almacenar contraseñas en el código.
+      const credential = await signInWithEmailAndPassword(auth, cleanEmail, password);
+      const adminEmail = SUPER_ADMIN_EMAILS.includes(cleanEmail) || ADMIN_EMAILS.includes(cleanEmail);
+      if (adminEmail && !credential.user.emailVerified) {
         try {
-          const { createUserWithEmailAndPassword } = await import('firebase/auth');
-          const { doc, setDoc } = await import('firebase/firestore');
-          const { db } = await import('../lib/firebase');
-          
-          const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
-          await setDoc(doc(db, 'users', userCredential.user.uid), {
-            uid: userCredential.user.uid,
-            email: cleanEmail,
-            fullName: "Administrador",
-            country: "",
-            role: 'admin',
-            createdAt: new Date().toISOString(),
-            lastLogin: new Date().toISOString(),
-          });
-          
-          setTimeout(() => navigate('/admin'), 500);
-          return;
-        } catch (bootstrapErr: any) {
-          if (import.meta.env.DEV) console.error("Failed to bootstrap admin:", bootstrapErr);
-          if (bootstrapErr.code === 'auth/email-already-in-use') {
-             setError('La cuenta admin ya existe en Firebase pero con otra contraseña (o método de inicio). Usa "¿Olvidaste tu contraseña?" o elimínala en Firebase Console.');
-             setLoading(false);
-             return;
-          }
+          await sendEmailVerification(credential.user);
+        } catch (verificationError) {
+          if (import.meta.env.DEV) console.error('Error enviando verificación', verificationError);
         }
+        await signOut(auth);
+        setError('Para acceder como administrador debes verificar el correo. Revisa tu bandeja y vuelve a iniciar sesión.');
+        return;
       }
-
+      navigate(rutaCeroLogo ? '/' : adminEmail ? '/admin' : '/diagnostico', { replace: true });
+    } catch (err: any) {
+      if (import.meta.env.DEV) console.error('Error iniciando sesión', err);
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
         setError('Credenciales incorrectas');
       } else if (err.code === 'auth/network-request-failed') {
-        setError('Error de conexión con Firebase. Esto suele deberse a un bloqueador de anuncios (AdBlock), una VPN o restricciones de red. Por favor, desactiva AdBlock para este sitio.');
+        setError('Error de conexión con Firebase. Verifica tu internet.');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Demasiados intentos. Intenta más tarde.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('El formato del correo no es correcto.');
       } else {
-        let msg = err.message;
-        if (err.code === 'auth/invalid-email') msg = "El formato del email es incorrecto";
-        if (err.code === 'auth/too-many-requests') msg = "Demasiados intentos. Intenta más tarde.";
-        setError(`Ocurrió un error al iniciar sesión: ${msg}`);
+        setError('No fue posible iniciar sesión. Intenta de nuevo o contacta a soporte.');
       }
     } finally {
       setLoading(false);
@@ -145,10 +91,13 @@ export default function Login() {
             transition={{ duration: 0.8 }}
           >
             <div className="flex justify-center mb-8 w-full">
-              <span className="font-sans font-bold tracking-tight lowercase text-sys-text-main text-[40px] leading-none">
-                systeam<span className="text-sys-accent">.</span>
-              </span>
+              {rutaCeroLogo ? <img src={rutaCeroLogo} alt="Ruta Cero" className="w-60" /> : (
+                <span className="font-sans font-bold tracking-tight lowercase text-sys-text-main text-[40px] leading-none">
+                  systeam<span className="text-sys-accent">.</span>
+                </span>
+              )}
             </div>
+            {rutaCeroLogo && <p className="mb-6 text-center text-sm text-sys-text-sec">Portal del programa de seis semanas. Entra con tu cuenta de Systeam.</p>}
 
             <div className="card-geometric">
               {!showForgot ? (
@@ -284,7 +233,7 @@ export default function Login() {
             
             <div className="mt-8 text-center">
               <p className="text-sm text-sys-text-mut">
-                ¿No tienes cuenta? Tu acceso es por invitación.<br className="hidden md:block"/> Contacta a SysTeam.
+                {rutaCeroLogo ? <>¿Aún no tienes acceso? <Link to="/crear-cuenta" className="font-semibold text-sys-accent underline">Crear cuenta</Link></> : <>¿No tienes cuenta? Tu acceso es por invitación.<br className="hidden md:block"/> Contacta a SysTeam.</>}
               </p>
             </div>
           </motion.div>

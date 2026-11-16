@@ -17,31 +17,20 @@ service cloud.firestore {
     }
     
     function isSuperAdmin() {
-      // IMPORTANTE: Mantener esta lista sincronizada con 
-      // SUPER_ADMIN_EMAILS en src/lib/admins.ts
-      return isAuthenticated() && (
-        request.auth.token.email in [
-          'emyr.arthuro@gmail.com'
-        ] ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData(request.auth.uid).role == 'super_admin')
-      );
+      return isAuthenticated()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in ['emyr.arthuro@gmail.com'];
     }
-    
+
     function isAdmin() {
-      // IMPORTANTE: Mantener esta lista sincronizada con ADMIN_EMAILS y 
-      // SUPER_ADMIN_EMAILS de src/lib/admins.ts. isAdmin() devuelve true 
-      // para admin Y para super_admin.
-      return isAuthenticated() && (
-        isSuperAdmin() || 
-        request.auth.token.email in [
-          'info@emyrarthuro.com'
-        ] ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-          (getUserData(request.auth.uid).role == 'admin')
-        )
-      );
+      return isAuthenticated()
+        && request.auth.token.email_verified == true
+        && (
+          isSuperAdmin()
+          || request.auth.token.email in ['info@emyrarthuro.com']
+        );
     }
-    
+
     // Safety net
     match /{document=**} {
       allow read, write: if false;
@@ -52,12 +41,22 @@ service cloud.firestore {
       allow get: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
       allow list: if isAdmin();
       
-      allow create: if isAuthenticated() && request.auth.uid == userId;
+      // Un usuario no puede asignarse un rol elevado creando su propio perfil.
+      allow create: if isAuthenticated() && request.auth.uid == userId
+        && request.resource.data.email == request.auth.token.email
+        && (
+          request.resource.data.role == 'student'
+          || (isSuperAdmin() && request.resource.data.role == 'super_admin')
+          || (isAdmin() && request.resource.data.role == 'admin')
+        );
       
       allow update: if isAuthenticated() && (
-        (request.auth.uid == userId && request.resource.data.role == resource.data.role) ||
+        // Self-service profile edits cannot rewrite identity or role metadata.
+        (request.auth.uid == userId
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.uid == resource.data.uid) ||
         isSuperAdmin() ||
-        (request.auth.uid == userId && request.auth.token.email == 'emyr.arthuro@gmail.com' && request.resource.data.role == 'super_admin') ||
         (isAdmin() && resource.data.role == 'student' && request.resource.data.role == 'student')
       );
       
