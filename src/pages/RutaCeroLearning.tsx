@@ -77,11 +77,10 @@ function ClassCard({ lesson, item, filesEnabled, refresh, selected }: {
     } catch (error) { setError(message(error)); } finally { setBusy(false); }
   }
 
-  const date = new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(lesson.date));
   return <article ref={card} tabIndex={-1} aria-label={lesson.title}
     className={panel + (selected ? ' ring-2 ring-sys-accent' : '')}>
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <p className="text-xs font-semibold uppercase tracking-wider text-sys-text-sec">Clase {lesson.day} · {date}</p>
+      <p className="text-xs font-semibold uppercase tracking-wider text-sys-text-sec">Clase {lesson.day}</p>
       <span className="rounded-full bg-sys-input px-3 py-1 text-xs font-semibold text-sys-accent">{item ? statusLabels[item.status] : 'Pendiente'}</span>
     </div>
     <h3 className="mt-2 text-lg font-bold">{lesson.title}</h3>

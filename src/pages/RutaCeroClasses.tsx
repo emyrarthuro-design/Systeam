@@ -6,7 +6,6 @@ import { learningRequest } from '../lib/rutaCeroLearning';
 type Library = { videos: Record<string, string>; admin: boolean; student: boolean };
 const button = 'btn-geometric-secondary disabled:opacity-50';
 const youtubeLink = (id: string) => 'https://www.youtube.com/watch?v=' + id;
-const lessonDate = new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'long', timeZone: 'UTC' });
 const weekStarts = lessons.filter(lesson => lesson.day === 1);
 
 function VideoEditor({ lessonId, videoId, onSave }: {
@@ -97,7 +96,7 @@ export default function RutaCeroClasses() {
       <h2 className="mb-3 text-xl font-bold">{selected.weekTitle}</h2>
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <article className="min-w-0 rounded-2xl border border-sys-border bg-sys-card p-4 sm:p-5">
-          <p className="text-sm text-sys-text-sec">{lessonDate.format(new Date(selected.date))} · {selected.teacher}</p>
+          <p className="text-sm text-sys-text-sec">Clase {selected.day} · {selected.teacher}</p>
           <h3 className="mb-3 mt-1 text-2xl font-bold">{selected.title}</h3>
           {videoId ?
             <iframe key={videoId} title={selected.title} src={'https://www.youtube.com/embed/' + videoId + '?playsinline=1'}
@@ -115,7 +114,7 @@ export default function RutaCeroClasses() {
         <nav aria-label="Clases de la semana" className="grid gap-2">
           {weekLessons.map(lesson => <button key={lesson.id} aria-pressed={selected.id === lesson.id}
             className={button + ' w-full text-left'} onClick={() => setSelectedId(lesson.id)}>
-            <span className="block">{lesson.title}</span>
+            <span className="block">Clase {lesson.day} · {lesson.title}</span>
             <span className="block text-xs text-sys-text-sec">{library.videos[lesson.id] ? 'Disponible' : 'Por publicar'}</span>
           </button>)}
         </nav>
